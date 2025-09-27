@@ -1,4 +1,4 @@
-﻿// Enhanced Customer UI management with Ajax-style search and print functionality
+// Enhanced Customer UI management with Ajax-style search and print functionality
 class CustomersUI {
     static currentCustomers = [];
     static filteredCustomers = [];
@@ -37,43 +37,15 @@ class CustomersUI {
             const services = await VendorsAPI.loadServices();
 
             this.vendorServices = services;
-            this.populateVendorServicesDropdown();
+            
+            // Use the new method from VendorsAPI to populate the subscription dropdown
+            VendorsAPI.populateSubscriptionServicesDropdown();
 
             console.log(`✅ Loaded ${services.length} vendor services`);
         } catch (error) {
             console.error('❌ Error loading vendor services:', error);
             Alerts.showError('Loading Error', 'Failed to load vendor services');
         }
-    }
-
-    static populateVendorServicesDropdown() {
-        const select = document.getElementById('vendorServiceSelectSub');
-        if (!select) {
-            console.warn('⚠️ vendorServiceSelectSub element not found');
-            return;
-        }
-
-        select.innerHTML = '<option value="">Choose a service...</option>';
-
-        if (this.vendorServices.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'No services available - Add vendors and services first';
-            option.disabled = true;
-            select.appendChild(option);
-            return;
-        }
-
-        this.vendorServices.forEach(service => {
-            const option = document.createElement('option');
-            option.value = service.ServiceName || service.service_name;
-            option.dataset.vendorId = service.VendorID || service.vendor_id;
-            option.dataset.vendorName = service.VendorName || service.vendor_name || 'Unknown Vendor';
-            option.textContent = `${service.ServiceName || service.service_name} (${service.VendorName || service.vendor_name || 'Unknown Vendor'})`;
-            select.appendChild(option);
-        });
-
-        console.log(`🔧 Populated vendor services dropdown with ${this.vendorServices.length} services`);
     }
 
     static displayCustomers(customers) {
@@ -102,7 +74,7 @@ class CustomersUI {
                             <strong>🆔 ID:</strong> ${customer.id || customer.CustomerID}<br>
                             <strong>📧 Email:</strong> ${customer.email || customer.Email}<br>
                             <strong>📱 Phone:</strong> ${customer.phone || customer.Phone || 'Not provided'}<br>
-                            <strong>📅 Added:</strong> ${Formatters.formatDate(customer.created_date || customer.CreatedDate)}
+                            <strong>📅 Added:</strong> ${this.formatDate(customer.created_date || customer.CreatedDate)}
                             ${(customer.address || customer.Address) ?
                     `<br><strong>🏠 Address:</strong> ${customer.address || customer.Address}` : ''
                 }
@@ -120,6 +92,24 @@ class CustomersUI {
                 </div>
             `;
         }).join('');
+    }
+
+    static formatDate(date) {
+        if (!date) return 'N/A';
+        
+        try {
+            const dateObj = new Date(date);
+            if (isNaN(dateObj.getTime())) return 'Invalid Date';
+            
+            return dateObj.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        } catch (error) {
+            console.warn('Error formatting date:', error);
+            return 'Invalid Date';
+        }
     }
 
     static updateCustomerCount(count) {
@@ -227,6 +217,7 @@ class CustomersUI {
             searchInput.value = `${customer.name || customer.Name} (${customer.email || customer.Email})`;
             hiddenInput.value = customerId;
 
+            console.log(`✅ Customer selected for subscription: ${customerId}`);
             this.hideCustomerDropdown();
         }
     }
@@ -300,10 +291,14 @@ class CustomersUI {
             setTimeout(async () => {
                 // Ensure services are loaded
                 if (this.vendorServices.length === 0) {
+                    console.log('🔧 No vendor services loaded, reloading...');
                     await this.loadVendorServices();
                 }
 
+                // Pre-select the customer
                 this.selectCustomerForSubscription(customerId);
+                
+                console.log(`✅ Pre-selected customer ${customerId} for subscription`);
             }, 100);
         } catch (error) {
             console.error('❌ Error adding subscription for customer:', error);
@@ -410,7 +405,21 @@ class CustomersUI {
         if (dropdown) {
             console.log('- Dropdown options:', dropdown.options.length);
             console.log('- Dropdown HTML:', dropdown.innerHTML);
+            
+            // Check if services have vendor info
+            Array.from(dropdown.options).forEach((option, index) => {
+                if (index > 0) { // Skip the first "Choose a service..." option
+                    console.log(`- Option ${index}: ${option.textContent}`);
+                    console.log(`  - Value: ${option.value}`);
+                    console.log(`  - VendorId: ${option.dataset.vendorId}`);
+                    console.log(`  - VendorName: ${option.dataset.vendorName}`);
+                }
+            });
         }
+        
+        // Debug vendor and service data in Store
+        console.log('- Vendors in store:', Store.getVendors().length);
+        console.log('- Services in store:', Store.getVendorServices().length);
     }
 }
 

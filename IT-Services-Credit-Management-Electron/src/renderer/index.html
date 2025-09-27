@@ -1,0 +1,577 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💳 IT Services Credit Management</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1>💳 IT Services Credit Management</h1>
+            <p>Track credits, manage vendors, and monitor profit margins</p>
+        </header>
+
+        <nav class="tab-nav">
+            <button class="tab-btn active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="tab-btn" onclick="showTab('pnl')">📈 P&L Statement</button>
+            <button class="tab-btn" onclick="showTab('credits')">💳 Credit Balances</button>
+            <button class="tab-btn" onclick="showTab('customers')">👥 Customer Management</button>
+            <button class="tab-btn" onclick="showTab('vendors')">🏭 Vendor Management</button>
+            <button class="tab-btn" onclick="showTab('business')">💼 Business Management</button>
+            <button class="tab-btn" onclick="showTab('transactions')">📊 Transaction History</button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <h2>📊 Dashboard & Analytics</h2>
+
+            <!-- Dashboard Stats -->
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCustomers">-</div>
+                    <div class="stat-label">Total Customers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCreditsUsed">-</div>
+                    <div class="stat-label">Credits Sold</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="netProfitFromCreditSales">$-</div>
+                    <div class="stat-label">Net Profit from Sales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgProfitPerCredit">$-</div>
+                    <div class="stat-label">Profit per Credit</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgRevenuePerCredit">$-</div>
+                    <div class="stat-label">Revenue per Credit</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgCostPerCredit">$-</div>
+                    <div class="stat-label">Cost per Credit</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalRevenue">$-</div>
+                    <div class="stat-label">Total Revenue</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalVendorCosts">$-</div>
+                    <div class="stat-label">Vendor Costs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="finalNetProfit">$-</div>
+                    <div class="stat-label">Final Net Profit</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCreditsRemaining">-</div>
+                    <div class="stat-label">Credits Remaining</div>
+                </div>
+                <div class="stat-card alert" id="lowCreditAlertsCard">
+                    <div class="stat-number" id="lowCreditAlerts">-</div>
+                    <div class="stat-label">⚠️ Low Credit Alerts</div>
+                </div>
+            </div>
+
+            <!-- Expiring Subscriptions Alerts -->
+            <div class="expiring-alerts">
+                <h3>⚠️ Expiring This Week</h3>
+                <div id="weeklyExpiringList" class="expiring-list"></div>
+
+                <h3>📅 Expiring This Month</h3>
+                <div id="monthlyExpiringList" class="expiring-list"></div>
+            </div>
+        </div>
+
+        <!-- P&L Tab (FIXED) -->
+        <div id="pnl" class="tab-content">
+            <h2>📈 Profit & Loss Statement</h2>
+
+            <div class="pnl-tabs">
+                <button class="tab-button active" onclick="showPLTab('monthly')">📅 Monthly</button>
+                <button class="tab-button" onclick="showPLTab('yearly')">📆 Yearly</button>
+            </div>
+
+            <!-- Monthly P&L Tab -->
+            <div id="monthly" class="pnl-tab-content active">
+                <h3>Monthly P&L Analysis</h3>
+                <form onsubmit="loadMonthlyPL(event)" class="form-inline">
+                    <div class="form-group">
+                        <label>📅 Select Month:</label>
+                        <select id="selectMonth" required>
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>📆 Select Year:</label>
+                        <select id="selectYear" required></select>
+                    </div>
+                    <button type="submit" class="btn-primary">📊 Load Monthly P&L</button>
+                </form>
+                <div id="monthlyPLResult" class="results-container"></div>
+            </div>
+
+            <!-- Yearly P&L Tab -->
+            <div id="yearly" class="pnl-tab-content">
+                <h3>Yearly P&L Analysis</h3>
+                <form onsubmit="loadYearlyPL(event)" class="form-inline">
+                    <div class="form-group">
+                        <label>📆 Select Year:</label>
+                        <select id="selectYearOnly" required></select>
+                    </div>
+                    <button type="submit" class="btn-primary">📊 Load Yearly P&L</button>
+                </form>
+                <div id="yearlyPLResult" class="results-container"></div>
+            </div>
+
+            <!-- Credit Balances in P&L Tab -->
+            <h3>💳 Current Credit Balances</h3>
+            <div id="creditBalancesList" class="credit-balances"></div>
+        </div>
+
+        <!-- Credits Tab -->
+        <div id="credits" class="tab-content">
+            <h2>💳 Credit Balances by Vendor</h2>
+            <div id="creditBalancesView" class="credit-balances"></div>
+        </div>
+
+        <!-- Customer Management Tab (ENHANCED) -->
+        <div id="customers" class="tab-content">
+            <h2>👥 Customer Management</h2>
+
+            <!-- Sub-tabs for Customer Management -->
+            <div class="customer-tabs">
+                <button class="tab-button active" onclick="showCustomerTab('customer-list')">📋 Customer List</button>
+                <button class="tab-button" onclick="showCustomerTab('add-customer')">➕ Add Customer</button>
+                <button class="tab-button" onclick="showCustomerTab('add-subscription')">📝 Add Subscription</button>
+                <button class="tab-button" onclick="showCustomerTab('edit-customer')">✏️ Edit Customer</button>
+            </div>
+
+            <!-- Customer List Sub-tab -->
+            <div id="customer-list" class="customer-tab-content active">
+                <h3>📋 Customer Directory</h3>
+
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <div class="search-bar">
+                        <input type="text" id="customerSearch" placeholder="🔍 Search customers by name, email, phone, or ID..."
+                               oninput="filterCustomers()">
+                        <button onclick="clearCustomerSearch()" class="btn-clear">✕ Clear</button>
+                    </div>
+                    <div class="search-stats">
+                        <span id="customerCount">0</span> customers found
+                    </div>
+                </div>
+
+                <!-- Customer List Display -->
+                <div id="customerListDisplay" class="customer-list"></div>
+            </div>
+
+            <!-- Add Customer Sub-tab -->
+            <div id="add-customer" class="customer-tab-content">
+                <h3>➕ Add New Customer</h3>
+                <form onsubmit="addCustomer(event)" class="form">
+                    <div class="form-group">
+                        <label>👤 Customer Name:</label>
+                        <input type="text" name="name" required maxlength="100" placeholder="Enter customer name">
+                    </div>
+                    <div class="form-group">
+                        <label>📧 Email Address:</label>
+                        <input type="email" name="email" required maxlength="100" placeholder="customer@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>📱 Phone Number:</label>
+                        <input type="tel" name="phone" maxlength="20" placeholder="+1-555-123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label>🏠 Address:</label>
+                        <textarea name="address" rows="3" maxlength="200" placeholder="Customer address (optional)"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Add Customer</button>
+                </form>
+            </div>
+
+            <!-- Add Subscription Sub-tab (ENHANCED) -->
+            <div id="add-subscription" class="customer-tab-content">
+                <h3>📝 Add New Subscription</h3>
+                <form onsubmit="addSubscription(event)" class="form">
+                    <div class="form-group">
+                        <label>👤 Select Customer:</label>
+                        <div class="customer-search-dropdown">
+                            <input type="text" id="customerSearchInput" placeholder="🔍 Type to search customers by name, email, phone, ID..."
+                                   oninput="searchCustomersForSubscription()" onfocus="showCustomerDropdown()">
+                            <input type="hidden" name="customerID" id="selectedCustomerID" required>
+                            <div id="customerDropdown" class="search-dropdown" style="display: none;">
+                                <div id="customerDropdownList"></div>
+                            </div>
+                        </div>
+                        <small>Or <a href="#" onclick="showCustomerTab('add-customer')">add a new customer first</a></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🔧 Service Name:</label>
+                        <input type="text" name="serviceName" value="IT App Services" readonly>
+                        <small>Service name is always "IT App Services"</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📍 Classification (Room/Location):</label>
+                        <input type="text" name="classification" placeholder="living room, bedroom, office, etc." maxlength="50">
+                        <small>Specify room, location, or area for this service</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🔧 Vendor Service:</label>
+                        <select name="vendorServiceName" id="vendorServiceSelectSub" required>
+                            <option value="">Choose a service...</option>
+                        </select>
+                        <small>Select the service you're providing to the customer</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📅 Start Date:</label>
+                        <input type="date" name="startDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📊 Credits to Use:</label>
+                        <input type="number" name="creditsSelected" min="1" max="60" required onchange="calculateExpirationDateSub()">
+                        <small>Each credit = 1 month of service</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>⏰ Expiration Date:</label>
+                        <input type="date" name="expirationDate" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label>💰 Amount Paid ($):</label>
+                        <input type="number" name="amountPaid" step="0.01" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📝 Notes:</label>
+                        <textarea name="notes" rows="3" maxlength="500" placeholder="Optional notes about this subscription"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📊 Status:</label>
+                        <select name="status">
+                            <option value="active">✅ Active</option>
+                            <option value="expired">❌ Expired</option>
+                            <option value="cancelled">🚫 Cancelled</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Add Subscription & Use Credits</button>
+                </form>
+            </div>
+
+            <!-- Edit Customer Sub-tab (ENHANCED) -->
+            <div id="edit-customer" class="customer-tab-content">
+                <h3>✏️ Edit Customer</h3>
+
+                <div class="form-group">
+                    <label>👤 Select Customer to Edit:</label>
+                    <select id="editCustomerSelect" onchange="loadCustomerForEdit()">
+                        <option value="">Choose a customer to edit...</option>
+                    </select>
+                </div>
+
+                <div id="editCustomerForm" style="display: none;">
+                    <form onsubmit="updateCustomer(event)" class="form">
+                        <input type="hidden" name="customerId" id="editCustomerId">
+
+                        <div class="form-group">
+                            <label>👤 Customer Name:</label>
+                            <input type="text" name="name" id="editCustomerName" required maxlength="100">
+                        </div>
+                        <div class="form-group">
+                            <label>📧 Email Address:</label>
+                            <input type="email" name="email" id="editCustomerEmail" required maxlength="100">
+                        </div>
+                        <div class="form-group">
+                            <label>📱 Phone Number:</label>
+                            <input type="tel" name="phone" id="editCustomerPhone" maxlength="20">
+                        </div>
+                        <div class="form-group">
+                            <label>🏠 Address:</label>
+                            <textarea name="address" id="editCustomerAddress" rows="3" maxlength="200"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>📊 Status:</label>
+                            <select name="status" id="editCustomerStatus">
+                                <option value="active">✅ Active</option>
+                                <option value="inactive">❌ Inactive</option>
+                            </select>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Update Customer</button>
+                            <button type="button" onclick="cancelEdit()" class="btn-secondary">Cancel</button>
+                            <button type="button" onclick="viewCustomerTransactions()" class="btn-info">📄 View Receipts</button>
+                            <button type="button" onclick="deleteCustomer()" class="btn-danger">🗑️ Delete Customer</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Customer Transaction History (when editing) -->
+                <div id="customerTransactionHistory" style="display: none;">
+                    <h4>📄 Transaction History</h4>
+                    <div id="editCustomerTransactions" class="customer-transactions"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vendor Management Tab -->
+        <div id="vendors" class="tab-content">
+            <h2>🏭 Vendor Management</h2>
+
+            <!-- Sub-tabs for Vendor Management -->
+            <div class="vendor-tabs">
+                <button class="tab-button active" onclick="showVendorTab('vendor-list')">📋 Vendor List</button>
+                <button class="tab-button" onclick="showVendorTab('add-vendor')">➕ Add Vendor</button>
+                <button class="tab-button" onclick="showVendorTab('vendor-services')">🔧 Service Catalog</button>
+                <button class="tab-button" onclick="showVendorTab('purchase-credits')">💸 Purchase Credits</button>
+            </div>
+
+            <!-- Vendor List Sub-tab -->
+            <div id="vendor-list" class="vendor-tab-content active">
+                <h3>📋 Vendor Directory</h3>
+
+                <!-- Search Bar for Vendors -->
+                <div class="search-container">
+                    <div class="search-bar">
+                        <input type="text" id="vendorSearch" placeholder="🔍 Search vendors by name, email, or description..."
+                               oninput="filterVendors()">
+                        <button onclick="clearVendorSearch()" class="btn-clear">✕ Clear</button>
+                    </div>
+                    <div class="search-stats">
+                        <span id="vendorCount">0</span> vendors found
+                    </div>
+                </div>
+
+                <!-- Vendor List Display -->
+                <div id="vendorListDisplay" class="vendor-list"></div>
+            </div>
+
+            <!-- Add Vendor Sub-tab -->
+            <div id="add-vendor" class="vendor-tab-content">
+                <h3>➕ Add New Vendor</h3>
+                <form onsubmit="addVendor(event)" class="form">
+                    <div class="form-group">
+                        <label>🏭 Vendor Name:</label>
+                        <input type="text" name="name" required maxlength="100" placeholder="Enter vendor name">
+                    </div>
+                    <div class="form-group">
+                        <label>📧 Contact Email:</label>
+                        <input type="email" name="contactEmail" maxlength="100" placeholder="contact@vendor.com">
+                    </div>
+                    <div class="form-group">
+                        <label>📱 Contact Phone:</label>
+                        <input type="tel" name="contactPhone" maxlength="20" placeholder="+1-555-123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label>📝 Description:</label>
+                        <textarea name="description" rows="3" maxlength="500" placeholder="Brief description of vendor services"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Add Vendor</button>
+                </form>
+            </div>
+
+            <!-- Vendor Services Sub-tab -->
+            <div id="vendor-services" class="vendor-tab-content">
+                <h3>🔧 Service Catalog Management</h3>
+
+                <!-- Service List Display -->
+                <div id="vendorServicesList" class="services-list"></div>
+
+                <div class="service-note">
+                    <strong>Note:</strong> Services are catalog entries. Prices are entered per transaction when purchasing credits.
+                </div>
+
+                <!-- Add Service Form -->
+                <h4>Add Service to Catalog</h4>
+                <form onsubmit="addVendorService(event)" class="form">
+                    <div class="form-group">
+                        <label>🏭 Select Vendor:</label>
+                        <select name="vendorID" id="serviceVendorSelect" required>
+                            <option value="">Choose a vendor...</option>
+                        </select>
+                        <small>Or <a href="#" onclick="showVendorTab('add-vendor')">add a new vendor first</a></small>
+                    </div>
+                    <div class="form-group">
+                        <label>🔧 Service Name:</label>
+                        <input type="text" name="serviceName" required maxlength="100" placeholder="e.g., GOLDTV, SMART4K, IPTV Premium">
+                    </div>
+                    <div class="form-group">
+                        <label>📝 Description:</label>
+                        <textarea name="description" rows="2" maxlength="500" placeholder="Brief service description"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Add Service to Catalog</button>
+                </form>
+            </div>
+
+            <!-- Purchase Credits Sub-tab -->
+            <div id="purchase-credits" class="vendor-tab-content">
+                <h3>💸 Purchase Credits</h3>
+
+                <div class="currency-note">
+                    <strong>💱 Currency Note:</strong> Convert your purchase amount to USD before entering. This helps maintain consistent profit calculations.
+                </div>
+
+                <!-- Purchase Credits Form -->
+                <h4>Record Credit Purchase</h4>
+                <form onsubmit="purchaseCredits(event)" class="form">
+                    <div class="form-group">
+                        <label>🏭 Select Vendor:</label>
+                        <select name="vendorID" id="purchaseVendorSelect" required onchange="loadServicesForPurchaseVendor()">
+                            <option value="">Choose a vendor...</option>
+                        </select>
+                        <small>Or <a href="#" onclick="showVendorTab('add-vendor')">add a new vendor first</a></small>
+                    </div>
+                    <div class="form-group">
+                        <label>🔧 Select Service:</label>
+                        <select name="serviceName" id="purchaseServiceSelect" required>
+                            <option value="">Choose a service...</option>
+                        </select>
+                        <small>Service must exist in catalog. <a href="#" onclick="showVendorTab('vendor-services')">Add to catalog</a> if needed.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Purchase Date:</label>
+                        <input type="date" name="purchaseDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>📊 Number of Credits:</label>
+                        <input type="number" name="credits" min="1" max="10000" required placeholder="e.g., 1000">
+                        <small>Each credit typically = 1 month of service to sell</small>
+                    </div>
+                    <div class="form-group">
+                        <label>💰 Total Cost in USD ($):</label>
+                        <input type="number" name="priceUSD" step="0.01" min="0" required placeholder="0.00">
+                        <small>Convert from other currencies to USD for consistent tracking</small>
+                    </div>
+                    <div class="form-group">
+                        <label>📝 Notes:</label>
+                        <textarea name="notes" rows="2" maxlength="500" placeholder="Exchange rates, payment method, additional notes..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">💸 Record Credit Purchase</button>
+                </form>
+
+                <!-- Recent Purchases -->
+                <h4>💳 Recent Credit Purchases</h4>
+                <div id="recentPurchasesList" class="transactions-list"></div>
+            </div>
+        </div>
+
+        <!-- Business Management Tab -->
+        <div id="business" class="tab-content">
+            <h2>💼 Business Management</h2>
+
+            <div class="business-forms">
+                <div class="form-section">
+                    <h3>💰 Add Money to Business</h3>
+                    <form onsubmit="addBusinessMoney(event)" class="form">
+                        <div class="form-group">
+                            <label>💵 Amount ($):</label>
+                            <input type="number" name="amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>📅 Date:</label>
+                            <input type="date" name="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>📝 Description:</label>
+                            <input type="text" name="description" maxlength="200" placeholder="Source of money">
+                        </div>
+                        <button type="submit" class="btn-success">Add Money</button>
+                    </form>
+                </div>
+
+                <div class="form-section">
+                    <h3>💸 Withdraw Money from Business</h3>
+                    <form onsubmit="withdrawBusinessMoney(event)" class="form">
+                        <div class="form-group">
+                            <label>💵 Amount ($):</label>
+                            <input type="number" name="amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>📅 Date:</label>
+                            <input type="date" name="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>📝 Description:</label>
+                            <input type="text" name="description" maxlength="200" placeholder="Purpose of withdrawal">
+                        </div>
+                        <button type="submit" class="btn-danger">Withdraw Money</button>
+                    </form>
+                </div>
+            </div>
+
+            <h3>📊 Business Transactions History</h3>
+            <div id="businessTransactionsList" class="transactions-list"></div>
+        </div>
+
+        <!-- Transaction History Tab -->
+        <div id="transactions" class="tab-content">
+            <h2>📊 Transaction History</h2>
+
+            <div class="transaction-tabs">
+                <button class="tab-button active" onclick="showTransactionTab('vendor-purchases')">🏭 Vendor Purchases</button>
+                <button class="tab-button" onclick="showTransactionTab('customer-sales')">👤 Customer Sales</button>
+            </div>
+
+            <div id="vendor-purchases" class="transaction-tab-content active">
+                <h3>Vendor Credit Purchases</h3>
+                <div id="vendorTransactionsList" class="transactions-list"></div>
+            </div>
+
+            <div id="customer-sales" class="transaction-tab-content">
+                <h3>Customer Sales</h3>
+                <div id="customerSalesList" class="transactions-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load scripts in dependency order -->
+    <!-- Load scripts in dependency order -->
+    <script src="js/utils/formatters.js"></script>
+    <script src="js/utils/validators.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/utils/print.js"></script>
+    <script src="js/state/store.js"></script>
+    <script src="js/api/alerts.js"></script>
+    <script src="js/api/customers.js"></script>
+    <script src="js/api/vendors.js"></script>
+    <script src="js/api/subscriptions.js"></script>
+    <script src="js/api/credits.js"></script>
+    <script src="js/api/business.js"></script>
+    <script src="js/api/pnl.js"></script>
+    <script src="js/ui/alerts.js"></script>
+    <script src="js/ui/dashboard.js"></script>
+    <script src="js/ui/tabs.js"></script>
+    <script src="js/ui/forms.js"></script>
+    <script src="js/ui/receipts.js"></script>
+    <script src="js/ui/vendors.js"></script>
+    <script src="js/ui/transactions.js"></script>
+    <script src="js/ui/reports.js"></script>
+    <script src="js/ui/credits.js"></script>
+    <script src="js/ui/business.js"></script>
+    <script src="js/ui/customers.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-﻿// Form handling and validation
+// Form handling and validation
 class Forms {
     static initialize() {
         console.log('📝 Initializing form system...');
@@ -73,6 +73,12 @@ class Forms {
         if (yearlyPLForm) {
             yearlyPLForm.addEventListener('submit', this.handleLoadYearlyPL);
         }
+
+        // Setup vendor service dropdown change handler
+        const vendorServiceSelect = document.getElementById('vendorServiceSelectSub');
+        if (vendorServiceSelect) {
+            vendorServiceSelect.addEventListener('change', this.handleVendorServiceChange);
+        }
     }
 
     // Form handlers
@@ -116,26 +122,84 @@ class Forms {
 
     static async handleAddSubscription(event) {
         event.preventDefault();
-        const formData = new FormData(event.target);
-
-        const subscriptionData = {
-            customerID: formData.get('customerID'),
-            serviceName: formData.get('serviceName'),
-            startDate: formData.get('startDate'),
-            creditsSelected: formData.get('creditsSelected'),
-            amountPaid: formData.get('amountPaid'),
-            status: formData.get('status'),
-            vendorID: formData.get('vendorID'),
-            vendorServiceName: formData.get('vendorServiceName'),
-            notes: formData.get('notes'),
-            classification: formData.get('classification')
-        };
-
+        console.log('📝 Processing subscription form submission...');
+        
         try {
+            const formData = new FormData(event.target);
+            
+            // Get vendor ID from the selected service
+            const vendorServiceSelect = document.getElementById('vendorServiceSelectSub');
+            const selectedOption = vendorServiceSelect?.options[vendorServiceSelect.selectedIndex];
+            const vendorID = selectedOption?.dataset.vendorId || '';
+            
+            console.log('Form data collected:', {
+                customerID: formData.get('customerID'),
+                serviceName: formData.get('serviceName'),
+                vendorServiceName: formData.get('vendorServiceName'),
+                vendorID: vendorID,
+                startDate: formData.get('startDate'),
+                creditsSelected: formData.get('creditsSelected'),
+                amountPaid: formData.get('amountPaid')
+            });
+
+            const subscriptionData = {
+                customerID: formData.get('customerID'),
+                serviceName: formData.get('serviceName'),
+                startDate: formData.get('startDate'),
+                creditsSelected: formData.get('creditsSelected'),
+                amountPaid: formData.get('amountPaid'),
+                status: formData.get('status') || 'active',
+                vendorID: vendorID,
+                vendorServiceName: formData.get('vendorServiceName'),
+                notes: formData.get('notes') || '',
+                classification: formData.get('classification') || ''
+            };
+
+            // Validate required fields
+            if (!subscriptionData.customerID) {
+                throw new Error('Please select a customer');
+            }
+            
+            if (!subscriptionData.vendorServiceName) {
+                throw new Error('Please select a vendor service');
+            }
+            
+            if (!subscriptionData.startDate) {
+                throw new Error('Please select a start date');
+            }
+            
+            if (!subscriptionData.creditsSelected || parseInt(subscriptionData.creditsSelected) <= 0) {
+                throw new Error('Please enter a valid number of credits');
+            }
+            
+            if (!subscriptionData.amountPaid || parseFloat(subscriptionData.amountPaid) <= 0) {
+                throw new Error('Please enter a valid payment amount');
+            }
+
             await SubscriptionsAPI.add(subscriptionData);
+            
+            // Reset form on success
             event.target.reset();
+            document.getElementById('selectedCustomerID').value = '';
+            document.getElementById('customerSearchInput').value = '';
+            
+            console.log('✅ Subscription added successfully');
         } catch (error) {
-            // Error already handled in SubscriptionsAPI
+            console.error('❌ Error in handleAddSubscription:', error);
+            // Error already handled in SubscriptionsAPI or thrown here
+        }
+    }
+
+    static handleVendorServiceChange(event) {
+        const select = event.target;
+        const selectedOption = select.options[select.selectedIndex];
+        
+        if (selectedOption && selectedOption.dataset.vendorId) {
+            console.log('Vendor service selected:', {
+                serviceName: selectedOption.value,
+                vendorId: selectedOption.dataset.vendorId,
+                vendorName: selectedOption.dataset.vendorName
+            });
         }
     }
 
@@ -330,6 +394,33 @@ class Forms {
         const formId = formElement.id || formElement.querySelector('button[type="submit"]')?.textContent || 'unknown';
         localStorage.removeItem(`form_draft_${formId}`);
     }
+
+    // Debug method for troubleshooting form issues
+    static debugSubscriptionForm() {
+        console.log('🔍 Debugging subscription form:');
+        
+        const form = document.querySelector('form[onsubmit*="addSubscription"]');
+        if (form) {
+            const formData = new FormData(form);
+            console.log('Form elements:', Object.fromEntries(formData));
+            
+            const customerID = document.getElementById('selectedCustomerID')?.value;
+            const vendorService = document.getElementById('vendorServiceSelectSub')?.value;
+            
+            console.log('Hidden fields:');
+            console.log('- customerID:', customerID);
+            console.log('- vendorService:', vendorService);
+            
+            const select = document.getElementById('vendorServiceSelectSub');
+            if (select) {
+                const option = select.options[select.selectedIndex];
+                console.log('- vendorID from option:', option?.dataset.vendorId);
+                console.log('- vendorName from option:', option?.dataset.vendorName);
+            }
+        } else {
+            console.log('Subscription form not found');
+        }
+    }
 }
 
 // Make available globally
@@ -386,4 +477,9 @@ function loadSelectedCustomerTransactions() {
     if (customerId) {
         ReceiptUI.displayCustomerTransactions(customerId);
     }
+}
+
+// Debug function for troubleshooting
+function debugSubscriptionForm() {
+    Forms.debugSubscriptionForm();
 }

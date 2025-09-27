@@ -106,6 +106,73 @@ class EmbeddedServer {
             }
         });
 
+        // PUT /api/customers/:customerId/status
+        this.app.put('/api/customers/:customerId/status', (req, res) => {
+            try {
+                const { customerId } = req.params;
+                const { status } = req.body;
+
+                if (!status || !['active', 'inactive'].includes(status)) {
+                    return res.status(400).json({ error: 'Valid status (active/inactive) is required' });
+                }
+
+                const stmt = this.db.prepare('UPDATE customers SET status = ? WHERE id = ?');
+                const result = stmt.run([status, customerId]);
+
+                if (result.changes === 0) {
+                    return res.status(404).json({ error: 'Customer not found' });
+                }
+
+                res.json({
+                    success: true,
+                    message: `Customer status updated to ${status}`
+                });
+            } catch (error) {
+                console.error('Error updating customer status:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // PUT /api/customers/:customerId
+        this.app.put('/api/customers/:customerId', (req, res) => {
+            try {
+                const { customerId } = req.params;
+                const { name, email, phone, address, status } = req.body;
+
+                if (!name || !email) {
+                    return res.status(400).json({ error: 'Name and email are required' });
+                }
+
+                // Check if email is already used by another customer
+                const existing = this.db.prepare('SELECT id FROM customers WHERE email = ? AND id != ?').get([email, customerId]);
+                if (existing) {
+                    return res.status(400).json({ error: 'Email is already used by another customer' });
+                }
+
+                const stmt = this.db.prepare(`
+                    UPDATE customers 
+                    SET name = ?, email = ?, phone = ?, address = ?, status = ?
+                    WHERE id = ?
+                `);
+
+                const result = stmt.run([name, email, phone || '', address || '', status || 'active', customerId]);
+
+                if (result.changes === 0) {
+                    return res.status(404).json({ error: 'Customer not found' });
+                }
+
+                const updatedCustomer = this.db.prepare('SELECT * FROM customers WHERE id = ?').get([customerId]);
+                res.json({
+                    success: true,
+                    message: 'Customer updated successfully',
+                    customer: updatedCustomer
+                });
+            } catch (error) {
+                console.error('Error updating customer:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         // GET /api/customers/:customerId/transactions
         this.app.get('/api/customers/:customerId/transactions', (req, res) => {
             try {
@@ -151,11 +218,11 @@ class EmbeddedServer {
             }
         });
 
-        // GET /api/customer-sales - NEW ENDPOINT TO FIX THE ISSUE
+        // GET /api/customer-sales
         this.app.get('/api/customer-sales', (req, res) => {
             try {
                 console.log('📊 Loading customer sales data...');
-                
+
                 const subscriptions = this.db.prepare(`
                     SELECT s.*, c.name as customer_name
                     FROM subscriptions s
@@ -203,9 +270,9 @@ class EmbeddedServer {
                 res.json(customerSales);
             } catch (error) {
                 console.error('❌ Error fetching customer sales:', error);
-                res.status(500).json({ 
+                res.status(500).json({
                     error: 'Failed to load customer sales',
-                    message: error.message 
+                    message: error.message
                 });
             }
         });
@@ -335,18 +402,79 @@ class EmbeddedServer {
             }
         });
 
-        // POST /api/subscriptions
+        // FIXED POST /api/subscriptions - Complete rewrite with proper error handling
         this.app.post('/api/subscriptions', (req, res) => {
+            console.log('📝 Received subscription request:', req.body);
+
             const transaction = this.db.transaction((subscriptionData) => {
                 try {
+                    console.log('📝 Processing subscription creation:', subscriptionData);
+
                     const {
                         customerID, serviceName, startDate, creditsSelected,
                         amountPaid, status, vendorID, vendorServiceName,
                         notes, classification
                     } = subscriptionData;
 
+                    // Validate required fields
+                    if (!customerID) {
+                        throw new Error('Customer ID is required');
+                    }
+                    if (!startDate) {
+                        throw new Error('Start date is required');
+                    }
+                    if (!creditsSelected || parseInt(creditsSelected) <= 0) {
+                        throw new Error('Credits selected must be greater than 0');
+                    }
+                    if (!amountPaid || parseFloat(amountPaid) <= 0) {
+                        throw new Error('Amount paid must be greater than 0');
+                    }
+
+                    // Verify customer exists and is active
+                    const customer = this.db.prepare('SELECT * FROM customers WHERE id = ? AND (status = "active" OR status IS NULL)').get([customerID]);
+                    if (!customer) {
+                        throw new Error('Customer not found or inactive');
+                    }
+
+                    console.log(`✅ Customer verified: ${customer.name}`);
+
+                    // If vendor service is specified, check credit availability
+                    if (vendorID && vendorServiceName) {
+                        console.log(`🔍 Checking credit availability for vendor: ${vendorID}, service: ${vendorServiceName}`);
+
+                        const creditBalance = this.db.prepare(`
+                            SELECT * FROM credit_balances 
+                            WHERE vendor_id = ? AND service_name = ?
+                        `).get([vendorID, vendorServiceName]);
+
+                        if (!creditBalance) {
+                            // Check if vendor and service exist
+                            const vendor = this.db.prepare('SELECT name FROM vendors WHERE vendor_id = ?').get([vendorID]);
+                            const service = this.db.prepare('SELECT * FROM vendor_services WHERE vendor_id = ? AND service_name = ?').get([vendorID, vendorServiceName]);
+
+                            if (!vendor) {
+                                throw new Error(`Vendor not found`);
+                            }
+                            if (!service) {
+                                throw new Error(`Service "${vendorServiceName}" not found for vendor`);
+                            }
+
+                            throw new Error(`No credit balance found for service: ${vendorServiceName}. Please purchase credits first.`);
+                        }
+
+                        if (creditBalance.remaining_credits < parseInt(creditsSelected)) {
+                            throw new Error(`Insufficient credits. Available: ${creditBalance.remaining_credits}, Required: ${creditsSelected}`);
+                        }
+
+                        console.log(`✅ Credit check passed. Available: ${creditBalance.remaining_credits}, Using: ${creditsSelected}`);
+                    }
+
                     // Calculate expiration date
                     const startDateObj = new Date(startDate);
+                    if (isNaN(startDateObj.getTime())) {
+                        throw new Error('Invalid start date');
+                    }
+
                     const expirationDateObj = new Date(startDateObj);
                     expirationDateObj.setMonth(expirationDateObj.getMonth() + parseInt(creditsSelected));
                     expirationDateObj.setDate(expirationDateObj.getDate() - 1);
@@ -362,30 +490,102 @@ class EmbeddedServer {
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                     `);
 
-                    stmt.run([
-                        subscriptionId, customerID, 'IT App Services', startDate,
-                        expirationDateObj.toISOString().split('T')[0], parseFloat(amountPaid),
-                        status || 'active', vendorID || '', vendorServiceName || '',
-                        parseInt(creditsSelected), notes || '', classification || ''
+                    const insertResult = stmt.run([
+                        subscriptionId,
+                        customerID,
+                        serviceName || 'IT App Services',
+                        startDate,
+                        expirationDateObj.toISOString().split('T')[0],
+                        parseFloat(amountPaid),
+                        status || 'active',
+                        vendorID || '',
+                        vendorServiceName || '',
+                        parseInt(creditsSelected),
+                        notes || '',
+                        classification || ''
                     ]);
+
+                    if (insertResult.changes === 0) {
+                        throw new Error('Failed to create subscription - no rows affected');
+                    }
+
+                    console.log(`✅ Subscription created with ID: ${subscriptionId}`);
+
+                    // If vendor service is specified, update credit balances and create usage record
+                    if (vendorID && vendorServiceName) {
+                        console.log('🔄 Updating credit balances...');
+
+                        // Update credit balance
+                        const updateStmt = this.db.prepare(`
+                            UPDATE credit_balances 
+                            SET remaining_credits = remaining_credits - ?, 
+                                total_used = total_used + ?,
+                                last_updated = datetime('now')
+                            WHERE vendor_id = ? AND service_name = ?
+                        `);
+
+                        const updateResult = updateStmt.run([
+                            parseInt(creditsSelected),
+                            parseInt(creditsSelected),
+                            vendorID,
+                            vendorServiceName
+                        ]);
+
+                        if (updateResult.changes === 0) {
+                            throw new Error('Failed to update credit balance - no rows affected');
+                        }
+
+                        console.log(`✅ Credit balance updated. Deducted ${creditsSelected} credits`);
+
+                        // Create credit usage record
+                        const usageId = this.generateId();
+                        const usageStmt = this.db.prepare(`
+                            INSERT INTO credit_usage (usage_id, vendor_id, service_name, subscription_id, credits_used, usage_date)
+                            VALUES (?, ?, ?, ?, ?, datetime('now'))
+                        `);
+
+                        const usageResult = usageStmt.run([usageId, vendorID, vendorServiceName, subscriptionId, parseInt(creditsSelected)]);
+
+                        if (usageResult.changes === 0) {
+                            throw new Error('Failed to create credit usage record');
+                        }
+
+                        console.log(`✅ Credit usage recorded with ID: ${usageId}`);
+                    }
 
                     return { subscriptionId };
                 } catch (error) {
+                    console.error('❌ Error in subscription transaction:', error);
                     throw error;
                 }
             });
 
             try {
+                console.log('🚀 Starting subscription transaction...');
                 const result = transaction(req.body);
-                const newSubscription = this.db.prepare('SELECT * FROM subscriptions WHERE id = ?').get([result.subscriptionId]);
+
+                const newSubscription = this.db.prepare(`
+                    SELECT s.*, c.name as customer_name
+                    FROM subscriptions s
+                    JOIN customers c ON s.customer_id = c.id
+                    WHERE s.id = ?
+                `).get([result.subscriptionId]);
+
+                console.log('✅ Subscription added successfully');
                 res.json({
                     success: true,
-                    message: 'Subscription added successfully',
+                    message: req.body.vendorID && req.body.vendorServiceName ?
+                        'Subscription added successfully and credits deducted' :
+                        'Subscription added successfully',
                     subscription: newSubscription
                 });
             } catch (error) {
-                console.error('Error creating subscription:', error);
-                res.status(500).json({ error: error.message });
+                console.error('❌ Error creating subscription:', error);
+                res.status(500).json({
+                    error: error.message || 'Failed to create subscription',
+                    details: 'Check server logs for more information',
+                    timestamp: new Date().toISOString()
+                });
             }
         });
 
@@ -521,7 +721,7 @@ class EmbeddedServer {
         this.app.get('/api/dashboard/stats', (req, res) => {
             try {
                 // Get customer count
-                const customerCount = this.db.prepare('SELECT COUNT(*) as count FROM customers').get();
+                const customerCount = this.db.prepare('SELECT COUNT(*) as count FROM customers WHERE (status = "active" OR status IS NULL)').get();
                 const totalCustomers = customerCount.count || 0;
 
                 // Get subscription stats
@@ -536,6 +736,7 @@ class EmbeddedServer {
                 // Calculate average cost per credit
                 const totalCreditsFromVendors = vendorTransactions.reduce((sum, trans) => sum + (trans.credits || 0), 0);
                 const avgCostPerCredit = totalCreditsFromVendors > 0 ? totalVendorCosts / totalCreditsFromVendors : 0;
+                const avgRevenuePerCredit = totalCreditsUsed > 0 ? totalRevenue / totalCreditsUsed : 0;
 
                 // Calculate profits
                 const netProfitFromCreditSales = totalRevenue - (totalCreditsUsed * avgCostPerCredit);
@@ -552,6 +753,7 @@ class EmbeddedServer {
                     totalRevenue,
                     totalVendorCosts,
                     avgCostPerCredit,
+                    avgRevenuePerCredit,
                     netProfitFromCreditSales,
                     finalNetProfit,
                     totalCreditsRemaining,
@@ -687,6 +889,10 @@ class EmbeddedServer {
                 try {
                     const { vendorID, serviceName, purchaseDate, credits, priceUSD, notes } = purchaseData;
 
+                    if (!vendorID || !serviceName || !credits || !priceUSD) {
+                        throw new Error('All required fields must be provided');
+                    }
+
                     const transactionId = this.generateId();
 
                     // Insert transaction
@@ -704,19 +910,21 @@ class EmbeddedServer {
                     `).get([vendorID, serviceName]);
 
                     if (existingBalance) {
-                        this.db.prepare(`
+                        const updateStmt = this.db.prepare(`
                             UPDATE credit_balances 
                             SET remaining_credits = remaining_credits + ?,
                                 total_purchased = total_purchased + ?,
                                 last_updated = datetime('now')
                             WHERE vendor_id = ? AND service_name = ?
-                        `).run([parseInt(credits), parseInt(credits), vendorID, serviceName]);
+                        `);
+                        updateStmt.run([parseInt(credits), parseInt(credits), vendorID, serviceName]);
                     } else {
                         const balanceId = this.generateId();
-                        this.db.prepare(`
+                        const insertStmt = this.db.prepare(`
                             INSERT INTO credit_balances (balance_id, vendor_id, service_name, remaining_credits, total_purchased, total_used, last_updated)
                             VALUES (?, ?, ?, ?, ?, 0, datetime('now'))
-                        `).run([balanceId, vendorID, serviceName, parseInt(credits), parseInt(credits)]);
+                        `);
+                        insertStmt.run([balanceId, vendorID, serviceName, parseInt(credits), parseInt(credits)]);
                     }
 
                     return { transactionId };

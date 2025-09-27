@@ -7,6 +7,7 @@ class DatabaseManager {
         this.db = null;
         this.SQL = null;
         this.dbPath = path.join(__dirname, '../../database/subscription-data.db');
+        this.inTransaction = false;
     }
 
     async initialize() {
@@ -178,66 +179,115 @@ class DatabaseManager {
         this.saveToFile();
     }
 
-    // SQL.js specific methods
+    // Fixed SQL.js specific methods with proper transaction handling
     prepare(sql) {
         const stmt = this.db.prepare(sql);
         return {
             get: (params = []) => {
-                stmt.bind(params);
-                if (stmt.step()) {
-                    const columns = stmt.getColumnNames();
-                    const values = stmt.get();
-                    const result = {};
-                    columns.forEach((col, i) => {
-                        result[col] = values[i];
-                    });
+                try {
+                    stmt.bind(params);
+                    if (stmt.step()) {
+                        const columns = stmt.getColumnNames();
+                        const values = stmt.get();
+                        const result = {};
+                        columns.forEach((col, i) => {
+                            result[col] = values[i];
+                        });
+                        stmt.reset();
+                        return result;
+                    }
                     stmt.reset();
-                    return result;
+                    return null;
+                } catch (error) {
+                    stmt.reset();
+                    throw error;
                 }
-                stmt.reset();
-                return null;
             },
             all: (params = []) => {
-                stmt.bind(params);
-                const results = [];
-                const columns = stmt.getColumnNames();
-                while (stmt.step()) {
-                    const values = stmt.get();
-                    const result = {};
-                    columns.forEach((col, i) => {
-                        result[col] = values[i];
-                    });
-                    results.push(result);
+                try {
+                    stmt.bind(params);
+                    const results = [];
+                    const columns = stmt.getColumnNames();
+                    while (stmt.step()) {
+                        const values = stmt.get();
+                        const result = {};
+                        columns.forEach((col, i) => {
+                            result[col] = values[i];
+                        });
+                        results.push(result);
+                    }
+                    stmt.reset();
+                    return results;
+                } catch (error) {
+                    stmt.reset();
+                    throw error;
                 }
-                stmt.reset();
-                return results;
             },
             run: (params = []) => {
-                stmt.bind(params);
-                const result = stmt.step();
-                stmt.reset();
-                this.saveToFile();
-                return { changes: result ? 1 : 0 };
+                try {
+                    stmt.bind(params);
+                    const result = stmt.step();
+                    const changes = this.db.getRowsModified();
+                    stmt.reset();
+
+                    // Save to file if not in transaction
+                    if (!this.inTransaction) {
+                        this.saveToFile();
+                    }
+
+                    return { changes: changes };
+                } catch (error) {
+                    stmt.reset();
+                    throw error;
+                }
             }
         };
     }
 
     exec(sql) {
-        const result = this.db.exec(sql);
-        this.saveToFile();
-        return result;
+        try {
+            const result = this.db.exec(sql);
+
+            // Save to file if not in transaction
+            if (!this.inTransaction) {
+                this.saveToFile();
+            }
+
+            return result;
+        } catch (error) {
+            throw error;
+        }
     }
 
+    // Fixed transaction method for SQL.js
     transaction(callback) {
         return (params) => {
             try {
-                this.db.exec('BEGIN TRANSACTION');
+                console.log('🔄 Starting database transaction...');
+                this.inTransaction = true;
+                this.db.exec('BEGIN IMMEDIATE');
+
                 const result = callback(params);
+
                 this.db.exec('COMMIT');
+                this.inTransaction = false;
+                console.log('✅ Transaction committed successfully');
+
+                // Save to file after successful transaction
                 this.saveToFile();
+
                 return result;
             } catch (error) {
-                this.db.exec('ROLLBACK');
+                console.error('❌ Transaction error, rolling back:', error);
+                try {
+                    if (this.inTransaction) {
+                        this.db.exec('ROLLBACK');
+                        console.log('🔄 Transaction rolled back');
+                    }
+                } catch (rollbackError) {
+                    console.error('❌ Rollback failed:', rollbackError);
+                }
+                this.inTransaction = false;
                 throw error;
             }
         };
@@ -249,7 +299,8 @@ class DatabaseManager {
             const buffer = Buffer.from(data);
             fs.writeFileSync(this.dbPath, buffer);
         } catch (error) {
-            console.error('Error saving database:', error);
+            console.error('❌ Error saving database:', error);
+            // Don't throw here as it would break the application
         }
     }
 

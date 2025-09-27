@@ -1,4 +1,4 @@
-// Form handling and validation
+// Form handling and validation - UPDATED VERSION
 class Forms {
     static initialize() {
         console.log('📝 Initializing form system...');
@@ -63,6 +63,12 @@ class Forms {
             withdrawForm.addEventListener('submit', this.handleWithdrawBusinessMoney);
         }
 
+        // Customer update form
+        const updateCustomerForm = document.querySelector('form[onsubmit*="updateCustomer"]');
+        if (updateCustomerForm) {
+            updateCustomerForm.addEventListener('submit', this.handleUpdateCustomer);
+        }
+
         // P&L forms
         const monthlyPLForm = document.querySelector('form[onsubmit*="loadMonthlyPL"]');
         if (monthlyPLForm) {
@@ -101,6 +107,27 @@ class Forms {
         }
     }
 
+    static async handleUpdateCustomer(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+
+        const customerId = formData.get('customerId');
+        const customerData = {
+            name: formData.get('name'),
+            email: formData.get('email'),
+            phone: formData.get('phone'),
+            address: formData.get('address'),
+            status: formData.get('status')
+        };
+
+        try {
+            await CustomersAPI.update(customerId, customerData);
+            // Don't reset form, user might want to make more changes
+        } catch (error) {
+            // Error already handled in CustomersAPI
+        }
+    }
+
     static async handleAddVendor(event) {
         event.preventDefault();
         const formData = new FormData(event.target);
@@ -120,34 +147,46 @@ class Forms {
         }
     }
 
+    // FIXED handleAddSubscription method
     static async handleAddSubscription(event) {
         event.preventDefault();
         console.log('📝 Processing subscription form submission...');
-        
+
+        // Show loading state
+        const submitButton = event.target.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        submitButton.textContent = '⏳ Adding Subscription...';
+        submitButton.disabled = true;
+
         try {
             const formData = new FormData(event.target);
-            
+
             // Get vendor ID from the selected service
             const vendorServiceSelect = document.getElementById('vendorServiceSelectSub');
             const selectedOption = vendorServiceSelect?.options[vendorServiceSelect.selectedIndex];
             const vendorID = selectedOption?.dataset.vendorId || '';
-            
-            console.log('Form data collected:', {
+            const vendorName = selectedOption?.dataset.vendorName || '';
+
+            console.log('📋 Form data collected:', {
                 customerID: formData.get('customerID'),
                 serviceName: formData.get('serviceName'),
                 vendorServiceName: formData.get('vendorServiceName'),
                 vendorID: vendorID,
+                vendorName: vendorName,
                 startDate: formData.get('startDate'),
                 creditsSelected: formData.get('creditsSelected'),
-                amountPaid: formData.get('amountPaid')
+                amountPaid: formData.get('amountPaid'),
+                classification: formData.get('classification'),
+                notes: formData.get('notes'),
+                status: formData.get('status')
             });
 
             const subscriptionData = {
                 customerID: formData.get('customerID'),
-                serviceName: formData.get('serviceName'),
+                serviceName: formData.get('serviceName') || 'IT App Services',
                 startDate: formData.get('startDate'),
-                creditsSelected: formData.get('creditsSelected'),
-                amountPaid: formData.get('amountPaid'),
+                creditsSelected: parseInt(formData.get('creditsSelected')),
+                amountPaid: parseFloat(formData.get('amountPaid')),
                 status: formData.get('status') || 'active',
                 vendorID: vendorID,
                 vendorServiceName: formData.get('vendorServiceName'),
@@ -155,51 +194,103 @@ class Forms {
                 classification: formData.get('classification') || ''
             };
 
-            // Validate required fields
+            // Enhanced client-side validation
+            const validationErrors = [];
+
             if (!subscriptionData.customerID) {
-                throw new Error('Please select a customer');
-            }
-            
-            if (!subscriptionData.vendorServiceName) {
-                throw new Error('Please select a vendor service');
-            }
-            
-            if (!subscriptionData.startDate) {
-                throw new Error('Please select a start date');
-            }
-            
-            if (!subscriptionData.creditsSelected || parseInt(subscriptionData.creditsSelected) <= 0) {
-                throw new Error('Please enter a valid number of credits');
-            }
-            
-            if (!subscriptionData.amountPaid || parseFloat(subscriptionData.amountPaid) <= 0) {
-                throw new Error('Please enter a valid payment amount');
+                validationErrors.push('Please select a customer');
             }
 
+            if (!subscriptionData.vendorServiceName) {
+                validationErrors.push('Please select a vendor service');
+            }
+
+            if (!subscriptionData.vendorID) {
+                validationErrors.push('Vendor service selection is incomplete. Please reselect the service.');
+            }
+
+            if (!subscriptionData.startDate) {
+                validationErrors.push('Please select a start date');
+            }
+
+            if (!subscriptionData.creditsSelected || subscriptionData.creditsSelected <= 0) {
+                validationErrors.push('Please enter a valid number of credits (greater than 0)');
+            }
+
+            if (subscriptionData.creditsSelected > 60) {
+                validationErrors.push('Credits cannot exceed 60 months');
+            }
+
+            if (!subscriptionData.amountPaid || subscriptionData.amountPaid <= 0) {
+                validationErrors.push('Please enter a valid payment amount (greater than $0)');
+            }
+
+            // Check if start date is not in the future beyond reasonable limits
+            const startDate = new Date(subscriptionData.startDate);
+            const today = new Date();
+            const maxFutureDate = new Date();
+            maxFutureDate.setMonth(maxFutureDate.getMonth() + 3); // Allow up to 3 months in future
+
+            if (startDate > maxFutureDate) {
+                validationErrors.push('Start date cannot be more than 3 months in the future');
+            }
+
+            if (validationErrors.length > 0) {
+                throw new Error(validationErrors.join('\n• '));
+            }
+
+            // Show validation passed
+            console.log('✅ Client-side validation passed');
+
+            // Call API to add subscription
+            console.log('🚀 Sending subscription to server...');
             await SubscriptionsAPI.add(subscriptionData);
-            
+
             // Reset form on success
             event.target.reset();
             document.getElementById('selectedCustomerID').value = '';
             document.getElementById('customerSearchInput').value = '';
-            
-            console.log('✅ Subscription added successfully');
+
+            // Hide dropdown if open
+            const dropdown = document.getElementById('customerDropdown');
+            if (dropdown) {
+                dropdown.style.display = 'none';
+            }
+
+            console.log('✅ Subscription added successfully - form reset');
+
         } catch (error) {
             console.error('❌ Error in handleAddSubscription:', error);
-            // Error already handled in SubscriptionsAPI or thrown here
+
+            // Show detailed error message
+            const errorMessage = error.message || 'An unknown error occurred while adding the subscription';
+
+            if (errorMessage.includes('\n•')) {
+                // Multiple validation errors
+                Alerts.showError('Validation Errors', `Please fix the following issues:\n• ${errorMessage}`);
+            } else {
+                // Single error
+                Alerts.showError('Subscription Error', errorMessage);
+            }
+        } finally {
+            // Restore button state
+            submitButton.textContent = originalButtonText;
+            submitButton.disabled = false;
         }
     }
 
     static handleVendorServiceChange(event) {
         const select = event.target;
         const selectedOption = select.options[select.selectedIndex];
-        
+
         if (selectedOption && selectedOption.dataset.vendorId) {
-            console.log('Vendor service selected:', {
+            console.log('🔧 Vendor service selected:', {
                 serviceName: selectedOption.value,
                 vendorId: selectedOption.dataset.vendorId,
                 vendorName: selectedOption.dataset.vendorName
             });
+        } else {
+            console.log('⚠️ No vendor service selected or missing vendor data');
         }
     }
 
@@ -398,25 +489,32 @@ class Forms {
     // Debug method for troubleshooting form issues
     static debugSubscriptionForm() {
         console.log('🔍 Debugging subscription form:');
-        
+
         const form = document.querySelector('form[onsubmit*="addSubscription"]');
         if (form) {
             const formData = new FormData(form);
             console.log('Form elements:', Object.fromEntries(formData));
-            
+
             const customerID = document.getElementById('selectedCustomerID')?.value;
             const vendorService = document.getElementById('vendorServiceSelectSub')?.value;
-            
+
             console.log('Hidden fields:');
             console.log('- customerID:', customerID);
             console.log('- vendorService:', vendorService);
-            
+
             const select = document.getElementById('vendorServiceSelectSub');
             if (select) {
                 const option = select.options[select.selectedIndex];
                 console.log('- vendorID from option:', option?.dataset.vendorId);
                 console.log('- vendorName from option:', option?.dataset.vendorName);
             }
+
+            // Check credit balances
+            const creditBalances = Store.getCreditBalances();
+            console.log('- Available credit balances:', creditBalances.length);
+            creditBalances.forEach(balance => {
+                console.log(`  - ${balance.vendor_name} ${balance.service_name}: ${balance.remaining_credits} credits`);
+            });
         } else {
             console.log('Subscription form not found');
         }
@@ -429,6 +527,10 @@ window.Forms = Forms;
 // Global functions for backward compatibility with HTML
 function addCustomer(event) {
     Forms.handleAddCustomer(event);
+}
+
+function updateCustomer(event) {
+    Forms.handleUpdateCustomer(event);
 }
 
 function addVendor(event) {

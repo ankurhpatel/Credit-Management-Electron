@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -148,6 +148,65 @@ class EmbeddedServer {
             } catch (error) {
                 console.error('Error fetching customer transactions:', error);
                 res.status(500).json({ error: error.message });
+            }
+        });
+
+        // GET /api/customer-sales - NEW ENDPOINT TO FIX THE ISSUE
+        this.app.get('/api/customer-sales', (req, res) => {
+            try {
+                console.log('📊 Loading customer sales data...');
+                
+                const subscriptions = this.db.prepare(`
+                    SELECT s.*, c.name as customer_name
+                    FROM subscriptions s
+                    JOIN customers c ON s.customer_id = c.id
+                    WHERE s.status = 'active'
+                    ORDER BY c.name, s.start_date DESC
+                `).all();
+
+                console.log(`Found ${subscriptions.length} customer subscriptions`);
+
+                // Group by customer name
+                const customerSales = {};
+                subscriptions.forEach(sub => {
+                    const customerName = sub.customer_name || 'Unknown Customer';
+                    const classification = sub.classification || 'General';
+
+                    if (!customerSales[customerName]) {
+                        customerSales[customerName] = {
+                            classifications: {}
+                        };
+                    }
+
+                    if (!customerSales[customerName].classifications[classification]) {
+                        customerSales[customerName].classifications[classification] = [];
+                    }
+
+                    customerSales[customerName].classifications[classification].push({
+                        id: sub.id,
+                        service_name: sub.service_name,
+                        start_date: sub.start_date,
+                        expiration_date: sub.expiration_date,
+                        amount_paid: sub.amount_paid || 0,
+                        credits_used: sub.credits_used || 0,
+                        status: sub.status,
+                        notes: sub.notes,
+                        created_date: sub.created_date,
+                        // Also include alternative property names for compatibility
+                        AmountPaid: sub.amount_paid || 0,
+                        CreditsUsed: sub.credits_used || 0,
+                        StartDate: sub.start_date
+                    });
+                });
+
+                console.log(`Grouped into ${Object.keys(customerSales).length} customers`);
+                res.json(customerSales);
+            } catch (error) {
+                console.error('❌ Error fetching customer sales:', error);
+                res.status(500).json({ 
+                    error: 'Failed to load customer sales',
+                    message: error.message 
+                });
             }
         });
     }

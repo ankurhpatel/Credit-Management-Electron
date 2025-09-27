@@ -1,4 +1,4 @@
-﻿// Vendor API calls and data management
+// Vendor API calls and data management
 class VendorsAPI {
     static async loadAll() {
         try {
@@ -8,6 +8,9 @@ class VendorsAPI {
 
             // Update global state
             Store.setVendors(vendors);
+
+            // Update UI dropdowns
+            this.populateVendorSelects();
 
             console.log(`✅ Loaded ${vendors.length} vendors`);
             return vendors;
@@ -24,22 +27,11 @@ class VendorsAPI {
             const response = await fetch('/api/vendor-services');
             const services = await response.json();
 
-            // Enhance services with vendor names
-            const vendors = Store.getVendors();
-            const enhancedServices = services.map(service => {
-                const vendor = vendors.find(v => (v.VendorID || v.vendor_id) === (service.VendorID || service.vendor_id));
-                return {
-                    ...service,
-                    vendor_name: vendor ? vendor.Name : 'Unknown Vendor',
-                    VendorName: vendor ? vendor.Name : 'Unknown Vendor'
-                };
-            });
-
             // Update global state
-            Store.setVendorServices(enhancedServices);
+            Store.setVendorServices(services);
 
-            console.log(`✅ Loaded ${enhancedServices.length} vendor services`);
-            return enhancedServices;
+            console.log(`✅ Loaded ${services.length} vendor services`);
+            return services;
         } catch (error) {
             console.error('❌ Error loading vendor services:', error);
             Alerts.showError('Loading Error', 'Failed to load vendor services');
@@ -50,6 +42,12 @@ class VendorsAPI {
     static async add(vendorData) {
         try {
             console.log('➕ Adding new vendor...');
+
+            // Validate data first
+            const validationResult = Validators.validateVendor(vendorData);
+            if (!validationResult.isValid) {
+                throw new Error(validationResult.errors.join(', '));
+            }
 
             const response = await fetch('/api/vendors', {
                 method: 'POST',
@@ -113,14 +111,121 @@ class VendorsAPI {
         }
     }
 
+    static populateVendorSelects() {
+        const vendors = Store.getVendors();
+        
+        const selects = [
+            document.getElementById('serviceVendorSelect'),
+            document.getElementById('purchaseVendorSelect')
+        ];
+
+        selects.forEach(select => {
+            if (!select) return;
+
+            // Store current selection
+            const currentValue = select.value;
+            
+            select.innerHTML = '<option value="">Choose a vendor...</option>';
+
+            vendors.forEach(vendor => {
+                const option = document.createElement('option');
+                option.value = vendor.vendor_id || vendor.VendorID;
+                option.textContent = vendor.name || vendor.Name;
+                select.appendChild(option);
+            });
+            
+            // Restore selection if it still exists
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        });
+
+        console.log(`🏭 Populated vendor selects with ${vendors.length} vendors`);
+    }
+
+    static async loadServicesForVendor(vendorId) {
+        try {
+            if (!vendorId) return;
+
+            console.log(`🔧 Loading services for vendor: ${vendorId}`);
+            const response = await fetch(`/api/vendor-services/${vendorId}`);
+            const services = await response.json();
+
+            const serviceSelect = document.getElementById('purchaseServiceSelect');
+            if (serviceSelect) {
+                serviceSelect.innerHTML = '<option value="">Choose a service...</option>';
+                
+                services.forEach(service => {
+                    const option = document.createElement('option');
+                    option.value = service.service_name || service.ServiceName;
+                    option.textContent = service.service_name || service.ServiceName;
+                    serviceSelect.appendChild(option);
+                });
+            }
+
+            console.log(`✅ Loaded ${services.length} services for vendor`);
+            return services;
+        } catch (error) {
+            console.error('❌ Error loading services for vendor:', error);
+            return [];
+        }
+    }
+
+    static async loadServicesForPurchase(vendorId) {
+        return this.loadServicesForVendor(vendorId);
+    }
+
     static getById(vendorId) {
         const vendors = Store.getVendors();
-        return vendors.find(v => (v.VendorID || v.vendor_id) === vendorId);
+        return vendors.find(v => (v.vendor_id || v.VendorID) === vendorId);
     }
 
     static getServicesByVendor(vendorId) {
         const services = Store.getVendorServices();
-        return services.filter(s => (s.VendorID || s.vendor_id) === vendorId);
+        return services.filter(s => (s.vendor_id || s.VendorID) === vendorId);
+    }
+
+    static getAllServices() {
+        return Store.getVendorServices();
+    }
+
+    // New method to populate services dropdown for subscription form
+    static populateSubscriptionServicesDropdown() {
+        const services = Store.getVendorServices();
+        const vendors = Store.getVendors();
+        
+        const select = document.getElementById('vendorServiceSelectSub');
+        if (!select) {
+            console.warn('⚠️ vendorServiceSelectSub element not found');
+            return;
+        }
+
+        select.innerHTML = '<option value="">Choose a service...</option>';
+
+        if (services.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No services available - Add vendors and services first';
+            option.disabled = true;
+            select.appendChild(option);
+            return;
+        }
+
+        services.forEach(service => {
+            // Find vendor for this service
+            const vendor = vendors.find(v => 
+                (v.vendor_id || v.VendorID) === (service.vendor_id || service.VendorID)
+            );
+            
+            const option = document.createElement('option');
+            option.value = service.service_name || service.ServiceName;
+            option.dataset.vendorId = service.vendor_id || service.VendorID;
+            option.dataset.vendorName = vendor ? (vendor.name || vendor.Name) : 'Unknown Vendor';
+            option.textContent = `${service.service_name || service.ServiceName} (${option.dataset.vendorName})`;
+            select.appendChild(option);
+        });
+
+        console.log(`🔧 Populated subscription services dropdown with ${services.length} services`);
     }
 }
 

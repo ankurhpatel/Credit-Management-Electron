@@ -482,15 +482,16 @@ class EmbeddedServer {
                     const subscriptionId = this.generateId();
 
                     // Insert subscription
+                    // In the subscription POST endpoint, add mac_address to the INSERT
                     const stmt = this.db.prepare(`
-                        INSERT INTO subscriptions (
-                            id, customer_id, service_name, start_date, expiration_date, 
-                            amount_paid, status, vendor_id, vendor_service_name, 
-                            credits_used, notes, classification, created_date
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                    `);
+    INSERT INTO subscriptions (
+        id, customer_id, service_name, start_date, expiration_date, 
+        amount_paid, status, vendor_id, vendor_service_name, 
+        credits_used, notes, classification, mac_address, created_date
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+`);
 
-                    const insertResult = stmt.run([
+                    stmt.run([
                         subscriptionId,
                         customerID,
                         serviceName || 'IT App Services',
@@ -502,8 +503,10 @@ class EmbeddedServer {
                         vendorServiceName || '',
                         parseInt(creditsSelected),
                         notes || '',
-                        classification || ''
+                        classification || '',
+                        macAddress || '',  // NEW FIELD
                     ]);
+
 
                     if (insertResult.changes === 0) {
                         throw new Error('Failed to create subscription - no rows affected');

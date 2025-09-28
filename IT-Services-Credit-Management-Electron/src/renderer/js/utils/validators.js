@@ -233,6 +233,14 @@ class Validators {
             .replace(/javascript:/gi, '') // Remove javascript: protocol
             .replace(/on\w+=/gi, ''); // Remove event handlers
     }
+    static validateMacAddress(macAddress) {
+        if (!macAddress) return true; // Optional field
+
+        // MAC address format: XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
+        const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+        return macRegex.test(macAddress);
+    }
+
 
     static validateRequired(fields, data) {
         const errors = [];

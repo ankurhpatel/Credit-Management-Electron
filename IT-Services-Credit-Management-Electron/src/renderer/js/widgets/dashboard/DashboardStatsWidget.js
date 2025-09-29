@@ -8,7 +8,7 @@
         return {
             ...super.getDefaultOptions(),
             autoRefresh: true,
-            refreshInterval: 30000,
+            refreshInterval: 30000, // 30 seconds
             showAnimations: true
         };
     }
@@ -17,12 +17,12 @@
         try {
             this.log('Loading dashboard statistics...');
 
-            // Use Electron IPC instead of HTTP fetch
+            // Use IPC instead of HTTP fetch
             if (window.require) {
                 const { ipcRenderer } = window.require('electron');
                 this.stats = await ipcRenderer.invoke('db-get-dashboard-stats');
             } else {
-                // Fallback for testing in browser
+                // Fallback for browser testing
                 this.stats = {
                     totalCustomers: 0,
                     activeSubscriptions: 0,
@@ -40,9 +40,9 @@
             }
 
             this.log('Dashboard stats loaded:', this.stats);
-
         } catch (error) {
             this.handleError('Failed to load dashboard statistics', error);
+            // Set default stats to prevent blank dashboard
             this.stats = {
                 totalCustomers: 0,
                 activeSubscriptions: 0,
@@ -61,9 +61,7 @@
     }
 
     async getTemplate() {
-        const hasStats = this.stats && Object.keys(this.stats).length > 0;
-
-        if (!hasStats) {
+        if (!this.stats || Object.keys(this.stats).length === 0) {
             return '<div class="dashboard-loading">Loading statistics...</div>';
         }
 
@@ -88,7 +86,7 @@
                 
                 <div class="dashboard-footer">
                     <small>Last updated: ${new Date().toLocaleString()}</small>
-                    <button class="btn-refresh" onclick="window.widgetManager.getWidget('dashboard-stats').refresh()">🔄 Refresh</button>
+                    <button class="btn-refresh" onclick="window.widgetManager?.getWidget('dashboard-stats')?.refresh()">🔄 Refresh</button>
                 </div>
             </div>
         `;
@@ -121,19 +119,6 @@
                 ${hasAlerts ? '<div class="alert-badge">!</div>' : ''}
             </div>
         `;
-    }
-
-    formatCurrency(amount) {
-        const safeAmount = parseFloat(amount) || 0;
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD'
-        }).format(safeAmount);
-    }
-
-    formatNumber(number) {
-        const safeNumber = parseFloat(number) || 0;
-        return new Intl.NumberFormat('en-US').format(safeNumber);
     }
 
     async onAfterRender() {
@@ -200,6 +185,19 @@
                 }, index * 100);
             });
         }
+    }
+
+    formatCurrency(amount) {
+        const safeAmount = parseFloat(amount) || 0;
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(safeAmount);
+    }
+
+    formatNumber(number) {
+        const safeNumber = parseFloat(number) || 0;
+        return new Intl.NumberFormat('en-US').format(safeNumber);
     }
 
     destroy() {

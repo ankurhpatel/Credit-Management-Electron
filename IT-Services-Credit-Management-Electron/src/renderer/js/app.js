@@ -18,9 +18,6 @@ class CreditManagementApp {
         try {
             console.log('🚀 Initializing Credit Management App...');
 
-            // Show loading screen
-            this.showLoadingScreen();
-
             // Initialize core services
             await this.initializeServices();
 
@@ -28,7 +25,8 @@ class CreditManagementApp {
             await this.loadUserSettings();
 
             // Initialize Widget Manager
-            await WidgetManager.initialize();
+            const widgetManager = new WidgetManager();
+            window.widgetManager = widgetManager;
 
             // Setup global event handlers
             this.setupGlobalEventHandlers();
@@ -42,8 +40,16 @@ class CreditManagementApp {
             // Perform initial data validation
             await this.validateInitialData();
 
-            // Hide loading screen
-            this.hideLoadingScreen();
+            // ** CRITICAL: Create the UI structure **
+            await this.createUIStructure();
+
+            // ** CRITICAL: Initialize and show the dashboard **
+            await this.initializeDashboard();
+
+            // Hide loading screen after UI is ready
+            setTimeout(() => {
+                this.hideLoadingScreen();
+            }, 1500);
 
             this.initialized = true;
             console.log('✅ Credit Management App initialized successfully');
@@ -57,34 +63,122 @@ class CreditManagementApp {
         }
     }
 
-    showLoadingScreen() {
-        document.body.innerHTML = `
-            <div id="app-loading-screen">
-                <div class="loading-content">
-                    <div class="loading-logo">💳</div>
-                    <h1>IT Services Credit Management</h1>
-                    <div class="loading-spinner"></div>
-                    <p class="loading-message">Initializing application...</p>
-                    <div class="loading-progress">
-                        <div class="progress-bar"></div>
+    async createUIStructure() {
+        try {
+            console.log('🏗️ Creating UI structure...');
+
+            // Create the main app container (preserve loading screen)
+            const loadingScreen = document.getElementById('loading-screen');
+
+            // Add the main app structure
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="app-container" style="display: none;">
+                    <div id="app-header"></div>
+                    <div id="main-navigation"></div>
+                    <div id="main-content">
+                        <div id="dashboard-container">
+                            <div id="dashboard-stats-widget"></div>
+                            <div id="dashboard-alerts-widget"></div>
+                            <div id="system-health-widget"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `);
+
+            // Initialize app header
+            const headerWidget = new AppHeaderWidget('app-header', {
+                showClock: true,
+                showVersion: true
+            });
+            await headerWidget.initialize();
+            window.widgetManager.registerWidget('app-header', headerWidget);
+
+            // Initialize main navigation
+            const navWidget = new MainNavigationWidget('main-navigation', {
+                tabs: ['dashboard', 'customers', 'vendors', 'credits', 'business', 'pnl', 'transactions'],
+                showIcons: true
+            });
+            await navWidget.initialize();
+            window.widgetManager.registerWidget('main-navigation', navWidget);
+
+            console.log('✅ UI structure created');
+        } catch (error) {
+            console.error('❌ Failed to create UI structure:', error);
+            throw error;
+        }
+    }
+
+    async initializeDashboard() {
+        try {
+            console.log('📊 Initializing dashboard...');
+
+            // Initialize dashboard stats widget
+            const statsWidget = new DashboardStatsWidget('dashboard-stats-widget', {
+                autoRefresh: true,
+                refreshInterval: 30000,
+                showAnimations: true
+            });
+            await statsWidget.initialize();
+            window.widgetManager.registerWidget('dashboard-stats', statsWidget);
+
+            // Initialize system health widget
+            const healthWidget = new SystemHealthWidget('system-health-widget', {
+                autoRefresh: true,
+                refreshInterval: 15000
+            });
+            await healthWidget.initialize();
+            window.widgetManager.registerWidget('system-health', healthWidget);
+
+            // Initialize alerts widget
+            const alertsWidget = new ExpiringAlertsWidget('dashboard-alerts-widget');
+            await alertsWidget.initialize();
+            window.widgetManager.registerWidget('dashboard-alerts', alertsWidget);
+
+            // Show the app container
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.style.display = 'block';
+            }
+
+            console.log('✅ Dashboard initialized successfully');
+        } catch (error) {
+            console.error('❌ Dashboard initialization failed:', error);
+            // Still show the basic structure
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.style.display = 'block';
+                document.getElementById('dashboard-container').innerHTML = `
+                    <div class="dashboard-error">
+                        <h2>⚠️ Dashboard Error</h2>
+                        <p>Failed to load dashboard widgets: ${error.message}</p>
+                        <button onclick="window.location.reload()" class="btn-primary">🔄 Reload</button>
+                    </div>
+                `;
+            }
+        }
     }
 
     hideLoadingScreen() {
-        const loadingScreen = document.getElementById('app-loading-screen');
+        const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
+            loadingScreen.style.transition = 'opacity 0.5s ease-out';
             loadingScreen.style.opacity = '0';
             setTimeout(() => {
-                loadingScreen.remove();
+                loadingScreen.style.display = 'none';
             }, 500);
         }
     }
 
     showErrorScreen(error) {
-        document.body.innerHTML = `
+        // Hide loading screen first
+        this.hideLoadingScreen();
+
+        const appContainer = document.getElementById('app-container');
+        if (appContainer) {
+            appContainer.remove();
+        }
+
+        document.body.insertAdjacentHTML('beforeend', `
             <div id="app-error-screen">
                 <div class="error-content">
                     <div class="error-icon">❌</div>
@@ -106,14 +200,59 @@ class CreditManagementApp {
                     </div>
                 </div>
             </div>
-        `;
+            <style>
+                #app-error-screen {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                }
+                .error-content {
+                    text-align: center;
+                    padding: 3rem;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 12px;
+                    backdrop-filter: blur(10px);
+                    max-width: 600px;
+                    margin: 0 2rem;
+                }
+                .error-icon { font-size: 4rem; margin-bottom: 1rem; }
+                .error-content h1 { margin-bottom: 1rem; font-size: 2rem; }
+                .error-content p { margin-bottom: 2rem; opacity: 0.9; }
+                .error-details { 
+                    background: rgba(0,0,0,0.2); 
+                    padding: 1rem; 
+                    border-radius: 8px; 
+                    margin-bottom: 2rem; 
+                    text-align: left; 
+                    font-family: monospace; 
+                    font-size: 0.875rem; 
+                }
+                .error-actions { display: flex; gap: 1rem; justify-content: center; }
+                .btn-primary, .btn-secondary { 
+                    padding: 0.75rem 2rem; 
+                    border: none; 
+                    border-radius: 6px; 
+                    font-weight: 600; 
+                    cursor: pointer; 
+                    transition: all 0.2s; 
+                }
+                .btn-primary { background: white; color: #333; }
+                .btn-secondary { background: #6c757d; color: white; }
+                .btn-primary:hover, .btn-secondary:hover { transform: translateY(-2px); }
+            </style>
+        `);
     }
 
     async initializeServices() {
         console.log('🔧 Initializing core services...');
-
-        // Initialize database connection
-        await this.initializeDatabase();
 
         // Initialize API client
         await this.initializeAPI();
@@ -125,31 +264,27 @@ class CreditManagementApp {
         this.initializeNotifications();
     }
 
-    async initializeDatabase() {
-        // In a real Electron app, this would initialize SQLite
-        console.log('💾 Database connection established');
-    }
-
     async initializeAPI() {
-        // Initialize API client with base configuration - FIXED FOR BROWSER
+        // Set API base URL for your Electron server
+        window.API_BASE_URL = 'http://localhost:3001/api';
+
         try {
-            // Detect environment safely
-            const isElectron = !!(window && window.process && window.process.type);
-            const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-            window.API_BASE_URL = isDevelopment ?
-                'http://localhost:3000/api' : '/api';
-
-            console.log('🌐 API client initialized for', isElectron ? 'Electron' : 'Browser', 'environment');
+            // Test API connection
+            const healthResponse = await fetch(`${window.API_BASE_URL}/health`);
+            if (healthResponse.ok) {
+                console.log('✅ API server connection verified');
+            } else {
+                console.warn('⚠️ API server responded but may have issues');
+            }
         } catch (error) {
-            // Fallback for any environment detection issues
-            window.API_BASE_URL = '/api';
-            console.log('🌐 API client initialized with fallback configuration');
+            console.warn('⚠️ API server connection failed - using fallback mode:', error.message);
+            // Don't throw error - let app continue in degraded mode
         }
+
+        console.log('🌐 API client initialized');
     }
 
     initializeLocalStorage() {
-        // Initialize local storage with default values
         const defaults = {
             theme: 'light',
             autoRefresh: true,
@@ -169,7 +304,6 @@ class CreditManagementApp {
     }
 
     initializeNotifications() {
-        // Request notification permission if supported
         if ('Notification' in window && Notification.permission === 'default') {
             Notification.requestPermission();
         }
@@ -214,56 +348,11 @@ class CreditManagementApp {
 
         document.addEventListener('widget:dataChanged', (e) => {
             console.log('Widget data changed:', e.detail);
-            // Could trigger auto-save or synchronization
-        });
-
-        // Handle navigation events
-        document.addEventListener('widget:addCustomerRequested', () => {
-            WidgetManager.showTab('customers');
-        });
-
-        document.addEventListener('widget:addVendorRequested', () => {
-            WidgetManager.showTab('vendors');
-        });
-
-        document.addEventListener('widget:purchaseCreditsRequested', (e) => {
-            WidgetManager.showTab('vendors');
-            // Could pre-select vendor/service if provided in e.detail
-        });
-
-        document.addEventListener('widget:viewReceiptsRequested', (e) => {
-            this.showCustomerReceipts(e.detail.customerId);
-        });
-
-        // Handle business logic events
-        document.addEventListener('widget:customerAdded', (e) => {
-            this.showNotification('Success', 'Customer added successfully!', 'success');
-            this.refreshRelatedWidgets(['customer-list', 'dashboard-stats']);
-        });
-
-        document.addEventListener('widget:moneyAdded', (e) => {
-            this.showNotification('Success', `Added ${this.formatCurrency(e.detail.amount)} to business!`, 'success');
-            this.refreshRelatedWidgets(['business-balance', 'dashboard-stats']);
-        });
-
-        document.addEventListener('widget:creditsPurchased', (e) => {
-            this.showNotification('Success', 'Credits purchased successfully!', 'success');
-            this.refreshRelatedWidgets(['credit-balances', 'dashboard-stats']);
         });
 
         // Handle window events
         window.addEventListener('beforeunload', (e) => {
-            // Save any pending data
             this.saveApplicationState();
-        });
-
-        window.addEventListener('online', () => {
-            this.showNotification('Connection', 'Back online', 'info');
-            this.refreshAllWidgets();
-        });
-
-        window.addEventListener('offline', () => {
-            this.showNotification('Connection', 'Working offline', 'warning');
         });
 
         console.log('🎯 Global event handlers setup complete');
@@ -278,7 +367,6 @@ class CreditManagementApp {
             }, { passive: true });
         });
 
-        // Check for inactivity every minute
         setInterval(() => {
             const now = Date.now();
             if (now - this.lastActivity > this.activityTimeout) {
@@ -291,62 +379,37 @@ class CreditManagementApp {
 
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Only handle shortcuts if not typing in an input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                 return;
             }
 
-            // Ctrl/Cmd + shortcuts
             if (e.ctrlKey || e.metaKey) {
                 switch (e.key) {
                     case '1':
                         e.preventDefault();
-                        WidgetManager.showTab('dashboard');
+                        this.showTab('dashboard');
                         break;
                     case '2':
                         e.preventDefault();
-                        WidgetManager.showTab('customers');
+                        this.showTab('customers');
                         break;
                     case '3':
                         e.preventDefault();
-                        WidgetManager.showTab('vendors');
+                        this.showTab('vendors');
                         break;
                     case '4':
                         e.preventDefault();
-                        WidgetManager.showTab('credits');
+                        this.showTab('credits');
                         break;
                     case '5':
                         e.preventDefault();
-                        WidgetManager.showTab('pnl');
+                        this.showTab('pnl');
                         break;
                     case 'r':
                         e.preventDefault();
                         this.refreshCurrentTab();
                         break;
-                    case 'f':
-                        e.preventDefault();
-                        this.focusSearch();
-                        break;
-                    case 'n':
-                        e.preventDefault();
-                        this.showQuickAddDialog();
-                        break;
                 }
-            }
-
-            // Function keys
-            switch (e.key) {
-                case 'F1':
-                    e.preventDefault();
-                    this.showHelpDialog();
-                    break;
-                case 'F5':
-                    e.preventDefault();
-                    this.refreshCurrentTab();
-                    break;
-                case 'Escape':
-                    this.closeActiveModals();
-                    break;
             }
         });
 
@@ -357,18 +420,116 @@ class CreditManagementApp {
         console.log('🔍 Validating initial data...');
 
         try {
-            // Check if API endpoints are accessible
-            const healthCheck = await fetch(`${window.API_BASE_URL || '/api'}/health`).catch(() => null);
+            const healthCheck = await fetch(`${window.API_BASE_URL}/health`);
 
-            if (!healthCheck || !healthCheck.ok) {
-                console.warn('API health check failed - application may have limited functionality');
-            } else {
+            if (healthCheck.ok) {
                 console.log('✅ API health check passed');
+            } else {
+                console.warn('⚠️ API health check failed');
             }
 
-            console.log('✅ Initial data validation complete');
         } catch (error) {
-            console.warn('Data validation encountered issues:', error);
+            console.warn('⚠️ Data validation encountered issues:', error);
+        }
+
+        console.log('✅ Initial data validation complete');
+    }
+
+    async createUIStructure() {
+        try {
+            console.log('🏗️ Creating UI structure...');
+
+            // Keep loading screen but add app container
+            const appContainer = document.createElement('div');
+            appContainer.id = 'app-container';
+            appContainer.style.display = 'none'; // Hide initially
+
+            appContainer.innerHTML = `
+                <div id="app-header"></div>
+                <div id="main-navigation"></div>
+                <div id="main-content">
+                    <div id="dashboard-container">
+                        <div id="dashboard-stats-widget"></div>
+                        <div id="dashboard-alerts-widget"></div>
+                        <div id="system-health-widget"></div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(appContainer);
+
+            // Initialize app header
+            const headerWidget = new AppHeaderWidget('app-header', {
+                showClock: true,
+                showVersion: true
+            });
+            await headerWidget.initialize();
+            window.widgetManager.registerWidget('app-header', headerWidget);
+
+            // Initialize main navigation
+            const navWidget = new MainNavigationWidget('main-navigation', {
+                tabs: ['dashboard', 'customers', 'vendors', 'credits', 'business', 'pnl', 'transactions'],
+                showIcons: true
+            });
+            await navWidget.initialize();
+            window.widgetManager.registerWidget('main-navigation', navWidget);
+
+            console.log('✅ UI structure created');
+        } catch (error) {
+            console.error('❌ Failed to create UI structure:', error);
+            throw error;
+        }
+    }
+
+    async initializeDashboard() {
+        try {
+            console.log('📊 Initializing dashboard...');
+
+            // Initialize dashboard stats widget
+            const statsWidget = new DashboardStatsWidget('dashboard-stats-widget', {
+                autoRefresh: true,
+                refreshInterval: 30000,
+                showAnimations: true
+            });
+            await statsWidget.initialize();
+            window.widgetManager.registerWidget('dashboard-stats', statsWidget);
+
+            // Initialize system health widget
+            const healthWidget = new SystemHealthWidget('system-health-widget', {
+                autoRefresh: true,
+                refreshInterval: 15000
+            });
+            await healthWidget.initialize();
+            window.widgetManager.registerWidget('system-health', healthWidget);
+
+            // Initialize alerts widget
+            const alertsWidget = new ExpiringAlertsWidget('dashboard-alerts-widget');
+            await alertsWidget.initialize();
+            window.widgetManager.registerWidget('dashboard-alerts', alertsWidget);
+
+            // Show the app container now that everything is loaded
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.style.display = 'block';
+            }
+
+            console.log('✅ Dashboard initialized successfully');
+        } catch (error) {
+            console.error('❌ Dashboard initialization failed:', error);
+
+            // Still show the basic structure with error message
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.style.display = 'block';
+                document.getElementById('dashboard-container').innerHTML = `
+                    <div class="dashboard-error">
+                        <div class="error-icon">⚠️</div>
+                        <h2>Dashboard Error</h2>
+                        <p>Failed to load dashboard: ${error.message}</p>
+                        <button onclick="window.location.reload()" class="btn-primary">🔄 Reload</button>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -381,241 +542,76 @@ class CreditManagementApp {
             setTimeout(() => {
                 this.showNotification(
                     'Welcome!',
-                    'Welcome to IT Services Credit Management. Start by adding your first vendor or customer.',
+                    'Welcome to IT Services Credit Management. Your dashboard is now ready.',
                     'info',
-                    10000
+                    8000
                 );
-            }, 2000);
+            }, 3000);
         }
     }
 
-    // Utility methods
-    showNotification(title, message, type = 'info', duration = 5000) {
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `app-notification ${type}`;
-        notification.innerHTML = `
-            <div class="notification-icon">${this.getNotificationIcon(type)}</div>
-            <div class="notification-content">
-                <div class="notification-title">${title}</div>
-                <div class="notification-message">${message}</div>
-            </div>
-            <button class="notification-close">×</button>
-        `;
+    showTab(tabId) {
+        console.log(`Requesting tab change to: ${tabId}`);
 
-        // Add to page
-        document.body.appendChild(notification);
-
-        // Bind close button
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
+        // Basic tab switching - you can enhance this later
+        const tabContents = document.querySelectorAll('[id$="-container"]');
+        tabContents.forEach(content => {
+            content.style.display = 'none';
         });
 
-        // Auto-remove after duration
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
+        const targetContainer = document.getElementById(`${tabId}-container`);
+        if (targetContainer) {
+            targetContainer.style.display = 'block';
+        } else {
+            // Show dashboard as fallback
+            const dashboardContainer = document.getElementById('dashboard-container');
+            if (dashboardContainer) {
+                dashboardContainer.style.display = 'block';
             }
-        }, duration);
-
-        // Browser notification for important messages
-        if (type === 'error' || type === 'warning') {
-            this.showBrowserNotification(title, message);
         }
+
+        // Update navigation active state
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            item.classList.toggle('active', item.dataset.tabId === tabId);
+        });
     }
 
-    showBrowserNotification(title, message) {
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, {
-                body: message,
-                icon: '/icon.png'
-            });
-        }
-    }
+    showNotification(title, message, type = 'info', duration = 5000) {
+        console.log(`📢 ${type.toUpperCase()}: ${title} - ${message}`);
 
-    getNotificationIcon(type) {
-        const icons = {
-            'success': '✅',
-            'error': '❌',
-            'warning': '⚠️',
-            'info': 'ℹ️'
-        };
-        return icons[type] || 'ℹ️';
-    }
-
-    async refreshRelatedWidgets(widgetNames) {
-        for (const widgetName of widgetNames) {
-            const widget = WidgetManager.getWidget(widgetName);
-            if (widget && typeof widget.refresh === 'function') {
-                try {
-                    await widget.refresh();
-                } catch (error) {
-                    console.error(`Failed to refresh widget ${widgetName}:`, error);
-                }
-            }
+        // Simple notification (you can enhance this later)
+        if (type === 'error') {
+            console.error(`❌ ${title}: ${message}`);
+        } else if (type === 'warning') {
+            console.warn(`⚠️ ${title}: ${message}`);
+        } else {
+            console.log(`ℹ️ ${title}: ${message}`);
         }
     }
 
     async refreshCurrentTab() {
-        try {
-            await WidgetManager.refreshCurrentTab();
-            this.showNotification('Refreshed', 'Current tab data has been refreshed', 'success', 2000);
-        } catch (error) {
-            this.showNotification('Error', 'Failed to refresh current tab', 'error');
+        console.log('🔄 Refreshing current tab...');
+        // Implement refresh logic
+        const dashboardStats = window.widgetManager?.getWidget('dashboard-stats');
+        if (dashboardStats) {
+            await dashboardStats.refresh();
         }
-    }
-
-    async refreshAllWidgets() {
-        try {
-            const activeWidgets = Array.from(WidgetManager.activeWidgets?.values() || []);
-            await Promise.all(
-                activeWidgets.map(widget =>
-                    widget.refresh ? widget.refresh() : Promise.resolve()
-                )
-            );
-            this.showNotification('Refreshed', 'All data has been refreshed', 'success', 2000);
-        } catch (error) {
-            this.showNotification('Error', 'Failed to refresh all widgets', 'error');
-        }
-    }
-
-    focusSearch() {
-        // Try to focus the search input in the current tab
-        const searchInputs = document.querySelectorAll('input[type="text"]:not([hidden]), input[type="search"]:not([hidden])');
-        const visibleSearchInputs = Array.from(searchInputs).filter(input => {
-            return input.offsetParent !== null &&
-                input.placeholder &&
-                input.placeholder.toLowerCase().includes('search');
-        });
-
-        if (visibleSearchInputs.length > 0) {
-            visibleSearchInputs[0].focus();
-        }
-    }
-
-    showQuickAddDialog() {
-        // Show a quick dialog to add common items
-        const modal = WidgetManager.getWidget('confirmation-modal');
-        if (modal) {
-            modal.show({
-                title: 'Quick Add',
-                message: `
-                    <div class="quick-add-options">
-                        <button class="btn-primary quick-add-btn" data-action="customer">👥 Add Customer</button>
-                        <button class="btn-primary quick-add-btn" data-action="subscription">📝 Add Subscription</button>
-                        <button class="btn-primary quick-add-btn" data-action="vendor">🏭 Add Vendor</button>
-                        <button class="btn-primary quick-add-btn" data-action="credits">💸 Buy Credits</button>
-                    </div>
-                `,
-                confirmText: 'Cancel',
-                cancelText: null,
-                onConfirm: () => { }
-            });
-
-            // Bind quick add buttons
-            setTimeout(() => {
-                document.querySelectorAll('.quick-add-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const action = e.target.getAttribute('data-action');
-                        modal.hide();
-
-                        switch (action) {
-                            case 'customer':
-                                WidgetManager.showTab('customers');
-                                break;
-                            case 'subscription':
-                                WidgetManager.showTab('customers');
-                                break;
-                            case 'vendor':
-                                WidgetManager.showTab('vendors');
-                                break;
-                            case 'credits':
-                                WidgetManager.showTab('vendors');
-                                break;
-                        }
-                    });
-                });
-            }, 100);
-        }
-    }
-
-    showHelpDialog() {
-        const modal = WidgetManager.getWidget('confirmation-modal');
-        if (modal) {
-            modal.show({
-                title: 'Keyboard Shortcuts',
-                message: `
-                    <div class="help-content">
-                        <h4>Navigation:</h4>
-                        <ul>
-                            <li><kbd>Ctrl+1</kbd> - Dashboard</li>
-                            <li><kbd>Ctrl+2</kbd> - Customers</li>
-                            <li><kbd>Ctrl+3</kbd> - Vendors</li>
-                            <li><kbd>Ctrl+4</kbd> - Credits</li>
-                            <li><kbd>Ctrl+5</kbd> - P&L Reports</li>
-                        </ul>
-                        
-                        <h4>Actions:</h4>
-                        <ul>
-                            <li><kbd>Ctrl+R</kbd> or <kbd>F5</kbd> - Refresh</li>
-                            <li><kbd>Ctrl+F</kbd> - Focus Search</li>
-                            <li><kbd>Ctrl+N</kbd> - Quick Add</li>
-                            <li><kbd>F1</kbd> - Show this help</li>
-                            <li><kbd>Escape</kbd> - Close dialogs</li>
-                        </ul>
-                    </div>
-                `,
-                confirmText: 'Got it',
-                cancelText: null,
-                onConfirm: () => { }
-            });
-        }
-    }
-
-    closeActiveModals() {
-        // Close any open modal dialogs
-        document.querySelectorAll('.modal-overlay').forEach(modal => {
-            if (modal.style.display !== 'none') {
-                modal.style.display = 'none';
-            }
-        });
-
-        // Hide dropdowns
-        document.querySelectorAll('.actions-dropdown').forEach(dropdown => {
-            dropdown.style.display = 'none';
-        });
     }
 
     handleInactivity() {
-        console.log('User inactive for extended period');
-        // Could implement auto-save, session timeout, etc.
+        console.log('⏰ User inactive for extended period');
     }
 
     saveApplicationState() {
         try {
             const state = {
-                currentTab: WidgetManager.currentTab,
                 timestamp: Date.now(),
                 settings: this.settings
             };
-
             localStorage.setItem('appState', JSON.stringify(state));
         } catch (error) {
             console.error('Failed to save application state:', error);
-        }
-    }
-
-    async showCustomerReceipts(customerId) {
-        // Create and show receipt widget
-        try {
-            const receiptWidget = new CustomerReceiptWidget('modal-container', {
-                customerId: customerId
-            });
-
-            await receiptWidget.initialize();
-        } catch (error) {
-            console.error('Failed to show customer receipts:', error);
-            this.showNotification('Error', 'Failed to load customer receipts', 'error');
         }
     }
 
@@ -634,7 +630,6 @@ class CreditManagementApp {
         }
     }
 
-    // Public API
     getSetting(key, defaultValue = null) {
         return this.settings[key] !== undefined ? this.settings[key] : defaultValue;
     }
@@ -648,18 +643,8 @@ class CreditManagementApp {
         return {
             initialized: this.initialized,
             uptime: Date.now() - this.initTime,
-            activeWidgets: WidgetManager.getStats ? WidgetManager.getStats() : {},
             lastActivity: this.lastActivity
         };
-    }
-
-    async restart() {
-        console.log('🔄 Restarting application...');
-        this.initialized = false;
-        if (WidgetManager.destroyAll) {
-            WidgetManager.destroyAll();
-        }
-        await this.initialize();
     }
 }
 
@@ -675,31 +660,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Handle unhandled promise rejections
+// Handle unhandled errors
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
-    if (window.CreditApp && window.CreditApp.showNotification) {
-        CreditApp.showNotification(
-            'Unexpected Error',
-            'An unexpected error occurred. Please check the console for details.',
-            'error'
-        );
-    }
 });
 
-// Handle JavaScript errors
 window.addEventListener('error', (event) => {
     console.error('JavaScript error:', event.error);
-    if (window.CreditApp && window.CreditApp.showNotification) {
-        CreditApp.showNotification(
-            'Application Error',
-            'A JavaScript error occurred. Some features may not work properly.',
-            'error'
-        );
-    }
 });
 
 // Export for use in other modules if needed
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CreditManagementApp;
 }
+
+console.log('📱 Credit Management App script loaded');

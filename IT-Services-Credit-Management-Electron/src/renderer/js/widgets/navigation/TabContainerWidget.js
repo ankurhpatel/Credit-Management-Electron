@@ -2,8 +2,8 @@
     constructor(containerId, options = {}) {
         super(containerId, options);
         this.tabs = new Map();
-        this.activeTab = null;
-        this.tabOrder = [];
+        this.activeTabId = null;
+        this.tabWidgets = new Map();
     }
 
     getDefaultOptions() {
@@ -11,467 +11,266 @@
             ...super.getDefaultOptions(),
             showTabIcons: true,
             allowTabClose: false,
-            showTabCount: true,
-            maxTabs: 10,
-            tabPosition: 'top',
-            animated: true
+            animated: true,
+            defaultTab: 'dashboard'
         };
     }
 
     async getTemplate() {
         return `
-            <div class="tab-container ${this.options.tabPosition}">
-                <div class="tab-navigation">
-                    <div class="tab-list">
-                        <!-- Tabs will be dynamically added here -->
-                    </div>
-                    <div class="tab-controls">
-                        <button class="tab-control-btn refresh-tab-btn" title="Refresh Current Tab">
-                            🔄
-                        </button>
-                        ${this.options.allowTabClose ? `
-                            <button class="tab-control-btn close-tab-btn" title="Close Current Tab">
-                                ✕
-                            </button>
-                        ` : ''}
+            <div class="tab-container">
+                <div class="tab-header">
+                    <div class="tab-nav" id="tab-nav">
+                        <!-- Tab navigation buttons will be inserted here -->
                     </div>
                 </div>
                 
                 <div class="tab-content-area">
-                    <div class="tab-content-wrapper" id="tab-content-wrapper">
-                        <div class="tab-loading">
-                            <div class="loading-spinner"></div>
-                            <p>Loading tab content...</p>
-                        </div>
+                    <div class="tab-content" id="tab-content">
+                        <!-- Tab content will be rendered here -->
                     </div>
                 </div>
             </div>
         `;
     }
 
-    bindEvents() {
-        // Tab controls
-        const refreshBtn = this.$('.refresh-tab-btn');
-        if (refreshBtn) {
-            this.addEventListener(refreshBtn, 'click', () => this.refreshCurrentTab());
-        }
+    async onAfterRender() {
+        this.tabNavElement = this.$('#tab-nav');
+        this.tabContentElement = this.$('#tab-content');
 
-        const closeBtn = this.$('.close-tab-btn');
-        if (closeBtn) {
-            this.addEventListener(closeBtn, 'click', () => this.closeCurrentTab());
-        }
+        // Setup event listeners
+        this.setupEventListeners();
+    }
 
-        // Keyboard shortcuts for tab navigation
-        this.addEventListener(document, 'keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                // Ctrl+Tab / Ctrl+Shift+Tab for tab switching
-                if (e.key === 'Tab') {
-                    e.preventDefault();
-                    this.switchTab(e.shiftKey ? 'previous' : 'next');
-                }
-                // Ctrl+W to close tab
-                else if (e.key === 'w' && this.options.allowTabClose) {
-                    e.preventDefault();
-                    this.closeCurrentTab();
-                }
+    setupEventListeners() {
+        // Handle tab clicks
+        this.tabNavElement.addEventListener('click', (e) => {
+            const tabButton = e.target.closest('.tab-button');
+            if (tabButton) {
+                const tabId = tabButton.dataset.tabId;
+                this.activateTab(tabId);
             }
         });
     }
 
-    // Tab management methods
-    addTab(tabId, tabConfig) {
-        if (this.tabs.has(tabId)) {
-            console.warn(`Tab ${tabId} already exists`);
-            return false;
-        }
-
-        if (this.tabs.size >= this.options.maxTabs) {
-            console.warn(`Maximum number of tabs (${this.options.maxTabs}) reached`);
-            return false;
-        }
-
-        const tab = {
+    addTab(tabId, config) {
+        const tabConfig = {
             id: tabId,
-            title: tabConfig.title || tabId,
-            icon: tabConfig.icon || '📄',
-            widget: tabConfig.widget || null,
-            widgetClass: tabConfig.widgetClass || null,
-            widgetOptions: tabConfig.widgetOptions || {},
-            content: tabConfig.content || '',
-            active: false,
-            loaded: false,
-            closable: tabConfig.closable !== false,
-            ...tabConfig
+            title: config.title || tabId,
+            icon: config.icon || '📄',
+            widgetClass: config.widgetClass || null,
+            closable: config.closable !== undefined ? config.closable : this.options.allowTabClose,
+            content: config.content || '',
+            ...config
         };
 
-        this.tabs.set(tabId, tab);
-        this.tabOrder.push(tabId);
+        this.tabs.set(tabId, tabConfig);
+        this.renderTabButton(tabConfig);
 
-        this.renderTabNavigation();
-
-        // Auto-activate if it's the first tab or explicitly requested
-        if (this.tabs.size === 1 || tabConfig.activate) {
-            this.activateTab(tabId);
-        }
-
-        this.emit('tabAdded', { tabId, tab });
+        this.log(`Tab added: ${tabId}`);
         return true;
     }
 
     removeTab(tabId) {
         if (!this.tabs.has(tabId)) {
-            console.warn(`Tab ${tabId} does not exist`);
             return false;
         }
 
-        const tab = this.tabs.get(tabId);
-
-        // Don't close non-closable tabs
-        if (!tab.closable) {
-            console.warn(`Tab ${tabId} is not closable`);
-            return false;
+        // Remove tab widget if it exists
+        const widget = this.tabWidgets.get(tabId);
+        if (widget && typeof widget.destroy === 'function') {
+            widget.destroy();
         }
+        this.tabWidgets.delete(tabId);
 
-        // If removing active tab, switch to another tab first
-        if (this.activeTab === tabId) {
-            const currentIndex = this.tabOrder.indexOf(tabId);
-            const nextTab = this.tabOrder[currentIndex + 1] || this.tabOrder[currentIndex - 1];
-
-            if (nextTab) {
-                this.activateTab(nextTab);
-            } else {
-                this.activeTab = null;
-            }
-        }
-
-        // Clean up tab widget if exists
-        if (tab.widget && typeof tab.widget.destroy === 'function') {
-            tab.widget.destroy();
-        }
-
+        // Remove from tabs collection
         this.tabs.delete(tabId);
-        this.tabOrder = this.tabOrder.filter(id => id !== tabId);
 
-        this.renderTabNavigation();
-        this.emit('tabRemoved', { tabId, tab });
-
-        return true;
-    }
-
-    activateTab(tabId) {
-        if (!this.tabs.has(tabId)) {
-            console.error(`Tab ${tabId} does not exist`);
-            return false;
+        // Remove tab button
+        const tabButton = this.tabNavElement.querySelector(`[data-tab-id="${tabId}"]`);
+        if (tabButton) {
+            tabButton.remove();
         }
 
-        // Deactivate current tab
-        if (this.activeTab) {
-            const currentTab = this.tabs.get(this.activeTab);
-            if (currentTab) {
-                currentTab.active = false;
-                // Hide current tab widget if it exists
-                if (currentTab.widget && typeof currentTab.widget.hide === 'function') {
-                    currentTab.widget.hide();
-                }
-            }
-        }
-
-        // Activate new tab
-        const newTab = this.tabs.get(tabId);
-        newTab.active = true;
-        this.activeTab = tabId;
-
-        // Render tab navigation to update active states
-        this.renderTabNavigation();
-
-        // Load and show tab content
-        this.loadTabContent(tabId);
-
-        this.emit('tabActivated', { tabId, tab: newTab });
-        return true;
-    }
-
-    async loadTabContent(tabId) {
-        const tab = this.tabs.get(tabId);
-        if (!tab) return;
-
-        // Get the content wrapper - use the specific ID we created
-        const contentWrapper = document.getElementById('tab-content-wrapper') ||
-            this.$('.tab-content-wrapper');
-
-        if (!contentWrapper) {
-            console.error('Tab content wrapper not found');
-            return;
-        }
-
-        try {
-            // Show loading state
-            contentWrapper.innerHTML = `
-                <div class="tab-loading">
-                    <div class="loading-spinner"></div>
-                    <p>Loading ${tab.title}...</p>
-                </div>
-            `;
-
-            // If tab has a widget class but no widget instance, create it
-            if (tab.widgetClass && !tab.widget) {
-                const WidgetClass = window[tab.widgetClass];
-                if (WidgetClass) {
-                    console.log(`Creating widget ${tab.widgetClass} for tab ${tabId}`);
-
-                    // Create a container for this specific tab widget
-                    const widgetContainer = document.createElement('div');
-                    widgetContainer.id = `tab-${tabId}-content`;
-                    widgetContainer.className = 'tab-widget-container';
-                    contentWrapper.appendChild(widgetContainer);
-
-                    // Create and initialize the widget
-                    tab.widget = new WidgetClass(widgetContainer.id, tab.widgetOptions || {});
-                    await tab.widget.initialize();
-                } else {
-                    throw new Error(`Widget class ${tab.widgetClass} not found`);
-                }
-            }
-
-            // Show the widget or content
-            if (tab.widget) {
-                // Clear loading state
-                if (contentWrapper.querySelector('.tab-loading')) {
-                    contentWrapper.innerHTML = `<div id="tab-${tabId}-content" class="tab-widget-container"></div>`;
-                }
-
-                if (typeof tab.widget.show === 'function') {
-                    tab.widget.show();
-                }
-            } else if (tab.content) {
-                contentWrapper.innerHTML = tab.content;
+        // If this was the active tab, activate another one
+        if (this.activeTabId === tabId) {
+            const remainingTabs = Array.from(this.tabs.keys());
+            if (remainingTabs.length > 0) {
+                this.activateTab(remainingTabs[0]);
             } else {
-                contentWrapper.innerHTML = `
-                    <div class="empty-tab">
-                        <div class="empty-icon">📄</div>
-                        <h3>Tab Content</h3>
-                        <p>This tab doesn't have any content configured yet.</p>
-                    </div>
-                `;
+                this.activeTabId = null;
+                this.tabContentElement.innerHTML = '<div class="no-tabs">No tabs available</div>';
             }
-
-            tab.loaded = true;
-            this.emit('tabLoaded', { tabId, tab });
-
-        } catch (error) {
-            console.error(`Failed to load tab ${tabId}:`, error);
-            contentWrapper.innerHTML = `
-                <div class="tab-error">
-                    <div class="error-icon">❌</div>
-                    <h4>Failed to Load Tab</h4>
-                    <p>${error.message}</p>
-                    <button class="btn-secondary retry-tab-btn" data-tab-id="${tabId}">
-                        🔄 Retry
-                    </button>
-                </div>
-            `;
-
-            // Bind retry button
-            const retryBtn = this.$('.retry-tab-btn');
-            if (retryBtn) {
-                this.addEventListener(retryBtn, 'click', () => this.loadTabContent(tabId));
-            }
-
-            this.emit('tabError', { tabId, tab, error });
-        }
-    }
-
-    renderTabNavigation() {
-        const tabList = this.$('.tab-list');
-        if (!tabList) return;
-
-        tabList.innerHTML = this.tabOrder.map(tabId => {
-            const tab = this.tabs.get(tabId);
-            return this.getTabTemplate(tab);
-        }).join('');
-
-        // Bind tab click events
-        this.$$('.tab-item').forEach(tabElement => {
-            const tabId = tabElement.getAttribute('data-tab-id');
-            this.addEventListener(tabElement, 'click', () => this.activateTab(tabId));
-
-            // Bind close button if tab is closable
-            const closeBtn = tabElement.querySelector('.tab-close-btn');
-            if (closeBtn) {
-                this.addEventListener(closeBtn, 'click', (e) => {
-                    e.stopPropagation();
-                    this.removeTab(tabId);
-                });
-            }
-        });
-    }
-
-    getTabTemplate(tab) {
-        return `
-            <div class="tab-item ${tab.active ? 'active' : ''} ${!tab.loaded ? 'loading' : ''}" 
-                 data-tab-id="${tab.id}"
-                 title="${this.escapeHtml(tab.title)}">
-                ${this.options.showTabIcons ? `
-                    <span class="tab-icon">${tab.icon}</span>
-                ` : ''}
-                <span class="tab-title">${this.escapeHtml(tab.title)}</span>
-                ${this.options.showTabCount && tab.count ? `
-                    <span class="tab-count">${tab.count}</span>
-                ` : ''}
-                ${tab.closable && this.options.allowTabClose ? `
-                    <button class="tab-close-btn" title="Close tab">×</button>
-                ` : ''}
-                ${!tab.loaded ? `<div class="tab-loading-indicator"></div>` : ''}
-            </div>
-        `;
-    }
-
-    // Navigation methods
-    switchTab(direction) {
-        if (this.tabOrder.length <= 1) return;
-
-        const currentIndex = this.tabOrder.indexOf(this.activeTab);
-        let newIndex;
-
-        if (direction === 'next') {
-            newIndex = (currentIndex + 1) % this.tabOrder.length;
-        } else {
-            newIndex = currentIndex === 0 ? this.tabOrder.length - 1 : currentIndex - 1;
         }
 
-        const newTabId = this.tabOrder[newIndex];
-        this.activateTab(newTabId);
-    }
-
-    refreshCurrentTab() {
-        if (!this.activeTab) return;
-
-        const tab = this.tabs.get(this.activeTab);
-        if (!tab) return;
-
-        // Mark tab as not loaded to force reload
-        tab.loaded = false;
-
-        // If tab has a widget with refresh method, call it
-        if (tab.widget && typeof tab.widget.refresh === 'function') {
-            tab.widget.refresh();
-        } else {
-            // Otherwise reload the tab content
-            this.loadTabContent(this.activeTab);
-        }
-
-        this.emit('tabRefreshed', { tabId: this.activeTab, tab });
-    }
-
-    closeCurrentTab() {
-        if (this.activeTab && this.options.allowTabClose) {
-            this.removeTab(this.activeTab);
-        }
-    }
-
-    // Utility methods
-    updateTabTitle(tabId, newTitle) {
-        const tab = this.tabs.get(tabId);
-        if (tab) {
-            tab.title = newTitle;
-            this.renderTabNavigation();
-        }
-    }
-
-    updateTabCount(tabId, count) {
-        const tab = this.tabs.get(tabId);
-        if (tab) {
-            tab.count = count;
-            this.renderTabNavigation();
-        }
-    }
-
-    updateTabIcon(tabId, icon) {
-        const tab = this.tabs.get(tabId);
-        if (tab) {
-            tab.icon = icon;
-            this.renderTabNavigation();
-        }
-    }
-
-    // Public API methods
-    getActiveTab() {
-        return this.activeTab;
-    }
-
-    getTab(tabId) {
-        return this.tabs.get(tabId);
-    }
-
-    getAllTabs() {
-        return Array.from(this.tabs.values());
-    }
-
-    getTabOrder() {
-        return [...this.tabOrder];
+        this.log(`Tab removed: ${tabId}`);
+        return true;
     }
 
     hasTab(tabId) {
         return this.tabs.has(tabId);
     }
 
+    getTab(tabId) {
+        const config = this.tabs.get(tabId);
+        if (!config) return null;
+
+        return {
+            ...config,
+            widget: this.tabWidgets.get(tabId)
+        };
+    }
+
+    async activateTab(tabId) {
+        if (!this.tabs.has(tabId)) {
+            this.log(`Tab ${tabId} does not exist`, 'error');
+            return false;
+        }
+
+        const previousTabId = this.activeTabId;
+        this.activeTabId = tabId;
+
+        // Update tab button states
+        this.updateTabButtonStates();
+
+        // Load tab content
+        await this.loadTabContent(tabId);
+
+        // Emit tab activation event
+        this.emit('tabActivated', {
+            tabId: tabId,
+            previousTabId: previousTabId
+        });
+
+        this.log(`Tab activated: ${tabId}`);
+        return true;
+    }
+
+    renderTabButton(tabConfig) {
+        const button = document.createElement('button');
+        button.className = 'tab-button';
+        button.dataset.tabId = tabConfig.id;
+
+        const icon = this.options.showTabIcons && tabConfig.icon ?
+            `<span class="tab-icon">${tabConfig.icon}</span>` : '';
+
+        const closeButton = tabConfig.closable ?
+            `<span class="tab-close" data-tab-id="${tabConfig.id}">×</span>` : '';
+
+        button.innerHTML = `
+            ${icon}
+            <span class="tab-title">${tabConfig.title}</span>
+            ${closeButton}
+        `;
+
+        this.tabNavElement.appendChild(button);
+
+        // Handle close button if present
+        if (tabConfig.closable) {
+            const closeBtn = button.querySelector('.tab-close');
+            closeBtn?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeTab(tabConfig.id);
+            });
+        }
+    }
+
+    updateTabButtonStates() {
+        this.tabNavElement.querySelectorAll('.tab-button').forEach(button => {
+            const tabId = button.dataset.tabId;
+            button.classList.toggle('active', tabId === this.activeTabId);
+        });
+    }
+
+    async loadTabContent(tabId) {
+        const tabConfig = this.tabs.get(tabId);
+        if (!tabConfig) return;
+
+        try {
+            // Show loading state
+            this.tabContentElement.innerHTML = '<div class="tab-loading">Loading...</div>';
+
+            // Check if widget already exists
+            let widget = this.tabWidgets.get(tabId);
+
+            if (!widget && tabConfig.widgetClass) {
+                // Create new widget instance
+                const WidgetClass = window[tabConfig.widgetClass];
+                if (!WidgetClass) {
+                    throw new Error(`Widget class ${tabConfig.widgetClass} not found`);
+                }
+
+                // Create a container for this tab's content
+                const tabContentId = `tab-content-${tabId}`;
+                this.tabContentElement.innerHTML = `<div id="${tabContentId}"></div>`;
+
+                widget = new WidgetClass(tabContentId, tabConfig.options || {});
+                await widget.initialize();
+
+                this.tabWidgets.set(tabId, widget);
+                this.log(`Widget created for tab ${tabId}: ${tabConfig.widgetClass}`);
+            } else if (tabConfig.content) {
+                // Static content
+                this.tabContentElement.innerHTML = tabConfig.content;
+            }
+
+            // Show/hide tab content based on active state
+            this.updateTabContentVisibility();
+
+        } catch (error) {
+            this.handleError(`Failed to load tab ${tabId}`, error);
+            this.tabContentElement.innerHTML = `
+                <div class="tab-error">
+                    <h3>Error Loading Tab</h3>
+                    <p>Failed to load ${tabConfig.title}</p>
+                    <button class="btn-retry" onclick="window.WidgetManager.showTab('${tabId}')">Retry</button>
+                </div>
+            `;
+        }
+    }
+
+    updateTabContentVisibility() {
+        // Hide all tab contents
+        this.tabContentElement.querySelectorAll('[id^="tab-content-"]').forEach(content => {
+            content.style.display = 'none';
+        });
+
+        // Show active tab content
+        if (this.activeTabId) {
+            const activeContent = this.tabContentElement.querySelector(`#tab-content-${this.activeTabId}`);
+            if (activeContent) {
+                activeContent.style.display = 'block';
+            }
+        }
+    }
+
     getTabCount() {
         return this.tabs.size;
     }
 
-    // State management
     getState() {
         return {
-            activeTab: this.activeTab,
-            tabOrder: [...this.tabOrder],
-            tabs: Array.from(this.tabs.entries()).map(([id, tab]) => ({
-                id,
-                title: tab.title,
-                icon: tab.icon,
-                loaded: tab.loaded,
-                closable: tab.closable
-            }))
+            activeTabId: this.activeTabId,
+            tabs: Array.from(this.tabs.keys())
         };
     }
 
-    restoreState(state) {
-        // Clear current tabs
-        this.tabs.clear();
-        this.tabOrder = [];
-        this.activeTab = null;
-
-        // Restore tabs (without widgets - those need to be re-added)
-        state.tabs.forEach(tabInfo => {
-            this.tabs.set(tabInfo.id, {
-                ...tabInfo,
-                active: false,
-                widget: null,
-                loaded: false
-            });
-        });
-
-        this.tabOrder = [...state.tabOrder];
-
-        // Restore active tab
-        if (state.activeTab && this.tabs.has(state.activeTab)) {
-            this.activateTab(state.activeTab);
+    async restoreState(state) {
+        if (state.activeTabId && this.tabs.has(state.activeTabId)) {
+            await this.activateTab(state.activeTabId);
         }
-
-        this.renderTabNavigation();
     }
 
     destroy() {
-        // Clean up all tab widgets
-        this.tabs.forEach(tab => {
-            if (tab.widget && typeof tab.widget.destroy === 'function') {
-                tab.widget.destroy();
+        // Destroy all tab widgets
+        this.tabWidgets.forEach((widget, tabId) => {
+            if (typeof widget.destroy === 'function') {
+                widget.destroy();
             }
         });
 
+        this.tabWidgets.clear();
         this.tabs.clear();
-        this.tabOrder = [];
-        this.activeTab = null;
-
         super.destroy();
     }
 }

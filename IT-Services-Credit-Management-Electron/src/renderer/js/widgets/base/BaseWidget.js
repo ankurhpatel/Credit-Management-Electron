@@ -1,323 +1,417 @@
-﻿// Base Widget class for all UI components
-class BaseWidget {
+﻿class BaseWidget {
     constructor(containerId, options = {}) {
         this.containerId = containerId;
-        this.container = document.getElementById(containerId);
         this.options = { ...this.getDefaultOptions(), ...options };
+        this.container = null;
         this.isInitialized = false;
-        this.eventListeners = [];
-        this.childWidgets = [];
-        this.data = {};
+        this.isDestroyed = false;
+        this.eventListeners = new Map();
+        this.childWidgets = new Map();
+        this.refreshTimer = null;
 
-        if (!this.container) {
-            console.warn(`Container element with ID "${containerId}" not found. Widget will be created without container.`);
-        }
-
-        // Auto-bind methods
-        this.render = this.render.bind(this);
+        // Bind methods to preserve 'this' context
+        this.refresh = this.refresh.bind(this);
         this.destroy = this.destroy.bind(this);
-        this.update = this.update.bind(this);
     }
 
     getDefaultOptions() {
         return {
             autoRender: true,
-            cacheable: true,
-            loadingIndicator: true,
-            errorHandling: true,
-            debug: false
+            debug: false,
+            className: '',
+            timeout: 10000
         };
     }
 
+    // Lifecycle Methods
     async initialize() {
-        if (this.isInitialized) {
-            console.warn(`Widget ${this.constructor.name} already initialized`);
-            return;
-        }
-
         try {
             this.log('Initializing widget...');
 
-            if (this.options.loadingIndicator && this.container) {
-                this.showLoading();
+            this.container = this.getContainer();
+            if (!this.container) {
+                throw new Error(`Container element '${this.containerId}' not found`);
             }
 
-            await this.onBeforeRender();
+            // Add widget class for styling
+            this.container.classList.add('widget');
+            if (this.options.className) {
+                this.container.classList.add(this.options.className);
+            }
+
+            // Load data first
             await this.loadData();
-            await this.render();
-            await this.onAfterRender();
-            this.bindEvents();
+
+            // Render if auto-render is enabled
+            if (this.options.autoRender) {
+                await this.render();
+            }
 
             this.isInitialized = true;
             this.log('Widget initialized successfully');
-            this.emit('initialized');
+
+            return true;
         } catch (error) {
             this.handleError('Failed to initialize widget', error);
+            throw error;
         }
     }
 
     async loadData() {
-        // Override in child classes to load required data
+        // Override in subclasses to load widget data
         this.log('Loading data...');
     }
 
     async render() {
-        if (!this.container) {
-            this.log('No container found, creating virtual widget');
-            return;
-        }
-
         try {
+            if (this.isDestroyed) {
+                this.log('Widget is destroyed, skipping render');
+                return;
+            }
+
+            this.log('Rendering widget...');
+
+            // Get template content
             const template = await this.getTemplate();
-            this.container.innerHTML = template;
-            this.log('Widget rendered');
+
+            // Update container content
+            if (this.container) {
+                this.container.innerHTML = template;
+
+                // Call post-render hook
+                await this.onAfterRender();
+
+                this.log('Widget rendered successfully');
+            }
+
         } catch (error) {
             this.handleError('Failed to render widget', error);
+            this.renderError(error);
         }
     }
 
     async getTemplate() {
-        return `<div class="widget ${this.constructor.name.toLowerCase()}">Base Widget</div>`;
-    }
-
-    async onBeforeRender() {
-        // Override in child classes for pre-render logic
+        // Override in subclasses to return HTML template
+        return '<div class="widget-placeholder">Widget content not implemented</div>';
     }
 
     async onAfterRender() {
-        // Override in child classes for post-render logic
-    }
-
-    bindEvents() {
-        // Override in child classes to bind event listeners
-    }
-
-    showLoading() {
-        if (this.container) {
-            this.container.innerHTML = `
-                <div class="widget-loading">
-                    <div class="loading-spinner"></div>
-                    <p>Loading ${this.constructor.name}...</p>
-                </div>
-            `;
-        }
-    }
-
-    showError(message, details = '') {
-        if (this.container) {
-            this.container.innerHTML = `
-                <div class="widget-error">
-                    <div class="error-icon">⚠️</div>
-                    <h4>Error in ${this.constructor.name}</h4>
-                    <p class="error-message">${message}</p>
-                    ${details ? `<p class="error-details">${details}</p>` : ''}
-                    <button onclick="this.parentElement.parentElement.widget?.initialize()" class="btn-retry">
-                        🔄 Retry
-                    </button>
-                </div>
-            `;
-        }
-    }
-
-    showEmpty(message = 'No data available') {
-        if (this.container) {
-            this.container.innerHTML = `
-                <div class="widget-empty">
-                    <div class="empty-icon">📭</div>
-                    <p class="empty-message">${message}</p>
-                </div>
-            `;
-        }
-    }
-
-    addEventListener(element, event, handler, options = {}) {
-        if (element && typeof handler === 'function') {
-            const boundHandler = handler.bind(this);
-            element.addEventListener(event, boundHandler, options);
-            this.eventListeners.push({ element, event, handler: boundHandler, options });
-        }
-    }
-
-    addChildWidget(widget) {
-        if (widget instanceof BaseWidget) {
-            this.childWidgets.push(widget);
-        }
-    }
-
-    async update(newOptions = {}, forceRender = false) {
-        try {
-            this.options = { ...this.options, ...newOptions };
-
-            if (forceRender || !this.isInitialized) {
-                await this.loadData();
-                await this.render();
-                this.bindEvents();
-            }
-
-            this.log('Widget updated');
-            this.emit('updated');
-        } catch (error) {
-            this.handleError('Failed to update widget', error);
-        }
+        // Override in subclasses for post-render logic
+        this.log('Post-render hook called');
     }
 
     async refresh() {
-        this.log('Refreshing widget...');
-        await this.update({}, true);
-    }
-
-    hide() {
-        if (this.container) {
-            this.container.style.display = 'none';
-        }
-        this.emit('hidden');
-    }
-
-    show() {
-        if (this.container) {
-            this.container.style.display = '';
-        }
-        this.emit('shown');
-    }
-
-    destroy() {
         try {
-            this.log('Destroying widget...');
+            this.log('Refreshing widget...');
 
-            // Destroy child widgets
-            this.childWidgets.forEach(widget => {
-                if (typeof widget.destroy === 'function') {
-                    widget.destroy();
-                }
-            });
-            this.childWidgets = [];
-
-            // Remove event listeners
-            this.eventListeners.forEach(({ element, event, handler, options }) => {
-                element.removeEventListener(event, handler, options);
-            });
-            this.eventListeners = [];
-
-            // Clear container
-            if (this.container) {
-                this.container.innerHTML = '';
-                this.container.widget = null;
+            if (!this.isInitialized || this.isDestroyed) {
+                this.log('Widget not ready for refresh');
+                return;
             }
 
-            // Clear data
-            this.data = {};
-            this.isInitialized = false;
+            await this.loadData();
+            await this.render();
 
-            this.log('Widget destroyed');
-            this.emit('destroyed');
+            this.log('Widget refreshed successfully');
         } catch (error) {
-            this.handleError('Error during widget destruction', error);
+            this.handleError('Failed to refresh widget', error);
         }
     }
 
-    // Event system
+    // DOM Helper Methods
+    getContainer() {
+        if (typeof this.containerId === 'string') {
+            return document.getElementById(this.containerId);
+        }
+        return this.containerId; // Assume it's already a DOM element
+    }
+
+    $(selector) {
+        if (!this.container) return null;
+        return this.container.querySelector(selector);
+    }
+
+    $$(selector) {
+        if (!this.container) return [];
+        return Array.from(this.container.querySelectorAll(selector));
+    }
+
+    createElement(tag, attributes = {}, content = '') {
+        const element = document.createElement(tag);
+
+        Object.keys(attributes).forEach(key => {
+            if (key === 'className') {
+                element.className = attributes[key];
+            } else if (key === 'dataset') {
+                Object.keys(attributes[key]).forEach(dataKey => {
+                    element.dataset[dataKey] = attributes[key][dataKey];
+                });
+            } else {
+                element.setAttribute(key, attributes[key]);
+            }
+        });
+
+        if (content) {
+            element.innerHTML = content;
+        }
+
+        return element;
+    }
+
+    // Event Methods
+    addEventListener(element, event, handler, options = {}) {
+        if (!element || !event || !handler) return;
+
+        const wrappedHandler = (e) => {
+            try {
+                handler.call(this, e);
+            } catch (error) {
+                this.handleError(`Event handler error for ${event}`, error);
+            }
+        };
+
+        element.addEventListener(event, wrappedHandler, options);
+
+        // Store for cleanup
+        const listenerId = `${event}_${Date.now()}_${Math.random()}`;
+        this.eventListeners.set(listenerId, {
+            element,
+            event,
+            handler: wrappedHandler,
+            options
+        });
+
+        return listenerId;
+    }
+
+    removeEventListener(listenerId) {
+        const listener = this.eventListeners.get(listenerId);
+        if (listener) {
+            listener.element.removeEventListener(listener.event, listener.handler, listener.options);
+            this.eventListeners.delete(listenerId);
+        }
+    }
+
     emit(eventName, data = {}) {
         const event = new CustomEvent(`widget:${eventName}`, {
-            detail: { widget: this, data }
+            detail: { widget: this, ...data }
         });
+
         if (this.container) {
             this.container.dispatchEvent(event);
         }
+
         document.dispatchEvent(event);
     }
 
     on(eventName, handler) {
-        const eventTarget = this.container || document;
-        eventTarget.addEventListener(`widget:${eventName}`, handler);
+        const wrappedHandler = (e) => {
+            if (e.detail.widget === this) {
+                handler.call(this, e.detail);
+            }
+        };
+
+        document.addEventListener(`widget:${eventName}`, wrappedHandler);
+
+        return this.addEventListener(document, `widget:${eventName}`, wrappedHandler);
     }
 
-    // Utility methods
-    $(selector) {
-        return this.container ? this.container.querySelector(selector) : null;
+    // Child Widget Management
+    addChildWidget(id, widget) {
+        this.childWidgets.set(id, widget);
+        this.log(`Child widget added: ${id}`);
     }
 
-    $$(selector) {
-        return this.container ? this.container.querySelectorAll(selector) : [];
-    }
-
-    addClass(className) {
-        if (this.container) {
-            this.container.classList.add(className);
+    removeChildWidget(id) {
+        const widget = this.childWidgets.get(id);
+        if (widget && typeof widget.destroy === 'function') {
+            widget.destroy();
         }
+        this.childWidgets.delete(id);
+        this.log(`Child widget removed: ${id}`);
     }
 
-    removeClass(className) {
-        if (this.container) {
-            this.container.classList.remove(className);
-        }
+    getChildWidget(id) {
+        return this.childWidgets.get(id);
     }
 
-    hasClass(className) {
-        return this.container ? this.container.classList.contains(className) : false;
-    }
-
-    setData(key, value) {
-        this.data[key] = value;
-        this.emit('dataChanged', { key, value });
-    }
-
-    getData(key) {
-        return this.data[key];
-    }
-
-    getAllData() {
-        return { ...this.data };
-    }
-
-    // Error handling
+    // Error Handling
     handleError(message, error) {
-        console.error(`${this.constructor.name}: ${message}`, error);
+        const errorInfo = {
+            widget: this.constructor.name,
+            container: this.containerId,
+            message: message,
+            error: error?.message || error,
+            stack: error?.stack,
+            timestamp: new Date().toISOString()
+        };
 
-        if (this.options.errorHandling) {
-            this.showError(message, error.message);
-        }
+        console.error('🔴 Widget Error:', errorInfo);
 
-        this.emit('error', { message, error });
+        // Emit error event
+        this.emit('error', errorInfo);
     }
 
-    // Logging
-    log(message, ...args) {
+    renderError(error) {
+        if (!this.container) return;
+
+        const errorMessage = error?.message || 'An unknown error occurred';
+        this.container.innerHTML = `
+            <div class="widget-error">
+                <div class="error-icon">⚠️</div>
+                <div class="error-content">
+                    <h4>Widget Error</h4>
+                    <p>${errorMessage}</p>
+                    <button class="btn-retry" onclick="this.closest('.widget').widget?.refresh()">
+                        🔄 Retry
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Store widget reference for retry button
+        this.container.widget = this;
+    }
+
+    // Utility Methods
+    log(message, level = 'info') {
         if (this.options.debug) {
-            console.log(`[${this.constructor.name}] ${message}`, ...args);
+            const prefix = `[${this.constructor.name}]`;
+            switch (level) {
+                case 'error':
+                    console.error(prefix, message);
+                    break;
+                case 'warn':
+                    console.warn(prefix, message);
+                    break;
+                default:
+                    console.log(prefix, message);
+            }
         }
     }
 
-    // Template helpers
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    formatCurrency(amount) {
+    formatCurrency(amount, currency = 'USD') {
+        const safeAmount = parseFloat(amount) || 0;
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'USD'
-        }).format(amount || 0);
+            currency: currency
+        }).format(safeAmount);
+    }
+
+    formatNumber(number) {
+        const safeNumber = parseFloat(number) || 0;
+        return new Intl.NumberFormat('en-US').format(safeNumber);
     }
 
     formatDate(date, options = {}) {
-        if (!date) return 'N/A';
-        return new Date(date).toLocaleDateString('en-US', {
+        const defaultOptions = {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        };
+
+        const formatOptions = { ...defaultOptions, ...options };
+        const dateObj = date instanceof Date ? date : new Date(date);
+
+        return dateObj.toLocaleDateString('en-US', formatOptions);
+    }
+
+    formatDateTime(date, options = {}) {
+        const defaultOptions = {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
-            ...options
-        });
+            hour: '2-digit',
+            minute: '2-digit'
+        };
+
+        const formatOptions = { ...defaultOptions, ...options };
+        const dateObj = date instanceof Date ? date : new Date(date);
+
+        return dateObj.toLocaleString('en-US', formatOptions);
     }
 
-    formatNumber(number, decimals = 0) {
-        return new Intl.NumberFormat('en-US', {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals
-        }).format(number || 0);
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    throttle(func, limit) {
+        let inThrottle;
+        return function executedFunction(...args) {
+            if (!inThrottle) {
+                func.apply(this, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
+    }
+
+    // State Management
+    getState() {
+        return {
+            isInitialized: this.isInitialized,
+            isDestroyed: this.isDestroyed,
+            options: this.options
+        };
+    }
+
+    setState(newState) {
+        Object.assign(this, newState);
+        this.log('State updated');
+    }
+
+    // Cleanup
+    destroy() {
+        try {
+            this.log('Destroying widget...');
+
+            // Mark as destroyed
+            this.isDestroyed = true;
+
+            // Clear refresh timer
+            if (this.refreshTimer) {
+                clearInterval(this.refreshTimer);
+                this.refreshTimer = null;
+            }
+
+            // Destroy child widgets
+            this.childWidgets.forEach((widget, id) => {
+                this.removeChildWidget(id);
+            });
+
+            // Remove all event listeners
+            this.eventListeners.forEach((listener, id) => {
+                this.removeEventListener(id);
+            });
+
+            // Clear container
+            if (this.container) {
+                this.container.innerHTML = '';
+                this.container.classList.remove('widget');
+                if (this.options.className) {
+                    this.container.classList.remove(this.options.className);
+                }
+                this.container.widget = null;
+            }
+
+            // Emit destroyed event
+            this.emit('destroyed');
+
+            this.log('Widget destroyed successfully');
+
+        } catch (error) {
+            console.error('Error during widget destruction:', error);
+        }
     }
 }
 
-// Make available globally
+// Make BaseWidget globally available
 window.BaseWidget = BaseWidget;

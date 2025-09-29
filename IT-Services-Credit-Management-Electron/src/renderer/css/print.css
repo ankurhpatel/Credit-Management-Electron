@@ -1,0 +1,751 @@
+/* Print-specific styles for IT Services Credit Management */
+
+@media print {
+    /* Page setup */
+    @page {
+        size: A4;
+        margin: 15mm;
+
+        @top-center {
+            content: "IT Services Credit Management";
+            font-size: 10px;
+            color: #666;
+        }
+
+        @bottom-center {
+            content: "Page " counter(page) " of " counter(pages);
+            font-size: 9px;
+            color: #666;
+        }
+    }
+
+    /* Reset and base styles */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    html, body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        font-size: 12px !important;
+        line-height: 1.4 !important;
+        color: #333 !important;
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Hide non-printable elements */
+    .no-print,
+    .print-hide,
+    .screen-only,
+    button:not(.print-show),
+    input[type="button"]:not(.print-show),
+    input[type="submit"]:not(.print-show),
+    input[type="reset"]:not(.print-show),
+    .btn:not(.print-show),
+    .sidebar,
+    .navigation,
+    .nav,
+    .toolbar,
+    .header-actions,
+    .modal-overlay,
+    .notification,
+    .tooltip,
+    .dropdown-menu,
+    .context-menu,
+    .loading-spinner,
+    .tab-navigation,
+    .filter-controls,
+    .actions-dropdown,
+    .more-actions,
+    .widget-actions:not(.print-show),
+    .alert-actions,
+    .transaction-actions,
+    .sale-actions,
+    .customer-actions,
+    .vendor-actions,
+    .form-actions:not(.print-show),
+    .search-container,
+    .filters-section,
+    .chart-navigation,
+    .pagination,
+    video,
+    audio,
+    embed,
+    iframe:not(.print-show) {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    /* Force show print elements */
+    .print-show,
+    .print-only {
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    /* Container and layout */
+    .print-container,
+    .print-area {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        background: white !important;
+    }
+
+    .container,
+    .main-content,
+    .widget,
+    .card,
+    .panel {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        background: white !important;
+        page-break-inside: avoid;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+        color: #333 !important;
+        font-weight: bold !important;
+        margin: 0 0 8px 0 !important;
+        page-break-after: avoid !important;
+    }
+
+    h1 {
+        font-size: 18px !important;
+    }
+
+    h2 {
+        font-size: 16px !important;
+    }
+
+    h3 {
+        font-size: 14px !important;
+    }
+
+    h4 {
+        font-size: 13px !important;
+    }
+
+    h5 {
+        font-size: 12px !important;
+    }
+
+    h6 {
+        font-size: 11px !important;
+    }
+
+    p {
+        margin: 0 0 6px 0 !important;
+        font-size: 11px !important;
+        line-height: 1.3 !important;
+        color: #333 !important;
+    }
+
+    /* Tables */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin: 10px 0 !important;
+        background: white !important;
+        page-break-inside: auto !important;
+    }
+
+    thead {
+        display: table-header-group !important;
+    }
+
+    tbody {
+        display: table-row-group !important;
+    }
+
+    tr {
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+    }
+
+    thead tr {
+        page-break-after: avoid !important;
+    }
+
+    th, td {
+        border: 1px solid #ddd !important;
+        padding: 6px 8px !important;
+        font-size: 10px !important;
+        text-align: left !important;
+        vertical-align: top !important;
+        background: white !important;
+    }
+
+    th {
+        background: #f5f5f5 !important;
+        font-weight: bold !important;
+        color: #333 !important;
+    }
+
+    /* Grid layouts for print */
+    .table-header,
+    .table-row,
+    .breakdown-header-row,
+    .breakdown-row,
+    .breakdown-total-row {
+        display: flex !important;
+        width: 100% !important;
+        border: 1px solid #ddd !important;
+        font-size: 10px !important;
+        page-break-inside: avoid !important;
+    }
+
+    .table-header,
+    .breakdown-header-row {
+        background: #f5f5f5 !important;
+        font-weight: bold !important;
+        border-bottom: 2px solid #333 !important;
+    }
+
+    .breakdown-total-row {
+        border-top: 2px solid #333 !important;
+        font-weight: bold !important;
+        background: #f9f9f9 !important;
+    }
+
+    /* Column widths for tables */
+    .col-date {
+        flex: 0 0 12%;
+        padding: 4px;
+    }
+
+    .col-customer {
+        flex: 0 0 18%;
+        padding: 4px;
+    }
+
+    .col-service {
+        flex: 0 0 20%;
+        padding: 4px;
+    }
+
+    .col-amount {
+        flex: 0 0 12%;
+        padding: 4px;
+        text-align: right;
+    }
+
+    .col-status {
+        flex: 0 0 10%;
+        padding: 4px;
+    }
+
+    .col-credits {
+        flex: 0 0 10%;
+        padding: 4px;
+        text-align: center;
+    }
+
+    .col-vendor {
+        flex: 0 0 15%;
+        padding: 4px;
+    }
+
+    .col-revenue {
+        flex: 0 0 12%;
+        padding: 4px;
+        text-align: right;
+    }
+
+    .col-customers {
+        flex: 0 0 10%;
+        padding: 4px;
+        text-align: center;
+    }
+
+    .col-avg {
+        flex: 0 0 12%;
+        padding: 4px;
+        text-align: right;
+    }
+
+    /* Status indicators */
+    .status-badge {
+        padding: 2px 6px !important;
+        border-radius: 3px !important;
+        font-size: 9px !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+    }
+
+    .status-active {
+        background: #e8f5e8 !important;
+        color: #4CAF50 !important;
+    }
+
+    .status-expired {
+        background: #ffeaea !important;
+        color: #f44336 !important;
+    }
+
+    .status-cancelled {
+        background: #fff3e0 !important;
+        color: #ff9800 !important;
+    }
+
+    .status-pending {
+        background: #f3f4f6 !important;
+        color: #6b7280 !important;
+    }
+
+    /* Value styling */
+    .positive {
+        color: #4CAF50 !important;
+        font-weight: bold !important;
+    }
+
+    .negative {
+        color: #f44336 !important;
+        font-weight: bold !important;
+    }
+
+    .text-danger {
+        color: #f44336 !important;
+    }
+
+    .text-success {
+        color: #4CAF50 !important;
+    }
+
+    .text-warning {
+        color: #ff9800 !important;
+    }
+
+    .text-info {
+        color: #2196F3 !important;
+    }
+
+    /* Cards and sections */
+    .summary-cards,
+    .stats-cards,
+    .metric-cards {
+        display: block !important;
+        width: 100% !important;
+        margin: 10px 0 !important;
+    }
+
+    .summary-card,
+    .stat-card,
+    .metric-card {
+        display: inline-block !important;
+        width: 48% !important;
+        margin: 1% !important;
+        padding: 8px !important;
+        border: 1px solid #ddd !important;
+        border-radius: 0 !important;
+        background: #f9f9f9 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid !important;
+    }
+
+    .card-value,
+    .stat-value,
+    .metric-value {
+        font-size: 14px !important;
+        font-weight: bold !important;
+        color: #333 !important;
+    }
+
+    .card-label,
+    .stat-label,
+    .metric-label {
+        font-size: 10px !important;
+        color: #666 !important;
+        text-transform: uppercase !important;
+    }
+
+    /* Lists */
+    ul, ol {
+        margin: 8px 0 !important;
+        padding-left: 20px !important;
+    }
+
+    li {
+        margin: 3px 0 !important;
+        font-size: 11px !important;
+        line-height: 1.3 !important;
+    }
+
+    /* Forms (for printed reports) */
+    .form-group {
+        margin: 8px 0 !important;
+        page-break-inside: avoid !important;
+    }
+
+    label {
+        font-weight: bold !important;
+        font-size: 10px !important;
+        color: #333 !important;
+        display: block !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Receipt-specific styles */
+    .receipt-document {
+        width: 100% !important;
+        max-width: none !important;
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .business-header {
+        text-align: center !important;
+        margin-bottom: 20px !important;
+        border-bottom: 2px solid #333 !important;
+        padding-bottom: 15px !important;
+        page-break-after: avoid !important;
+    }
+
+        .business-header h1 {
+            font-size: 20px !important;
+            margin: 0 0 5px 0 !important;
+            color: #333 !important;
+        }
+
+    .business-info {
+        font-size: 11px !important;
+        color: #666 !important;
+        line-height: 1.4 !important;
+    }
+
+    .receipt-header {
+        margin-bottom: 20px !important;
+        page-break-after: avoid !important;
+    }
+
+    .receipt-title h2 {
+        text-align: center !important;
+        font-size: 18px !important;
+        margin: 0 0 15px 0 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        border-bottom: 1px solid #ddd !important;
+        padding-bottom: 10px !important;
+    }
+
+    .receipt-metadata {
+        display: block !important;
+        font-size: 11px !important;
+        line-height: 1.6 !important;
+    }
+
+    .metadata-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        margin-bottom: 3px !important;
+        border-bottom: 1px dotted #ddd !important;
+        padding-bottom: 2px !important;
+    }
+
+    .customer-info {
+        margin: 20px 0 !important;
+        padding: 15px !important;
+        border: 2px solid #333 !important;
+        background: #f9f9f9 !important;
+        page-break-inside: avoid !important;
+    }
+
+        .customer-info h4 {
+            margin: 0 0 10px 0 !important;
+            font-size: 13px !important;
+            color: #333 !important;
+            text-transform: uppercase !important;
+            border-bottom: 1px solid #ccc !important;
+            padding-bottom: 5px !important;
+        }
+
+    .customer-details {
+        font-size: 11px !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Receipt totals */
+    .receipt-totals {
+        margin-top: 25px !important;
+        border-top: 3px double #333 !important;
+        padding-top: 15px !important;
+        page-break-inside: avoid !important;
+    }
+
+    .totals-section {
+        margin-bottom: 20px !important;
+    }
+
+    .totals-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        margin: 5px 0 !important;
+        font-size: 12px !important;
+        border-bottom: 1px dotted #ccc !important;
+        padding-bottom: 3px !important;
+    }
+
+        .totals-row.total {
+            border-top: 2px solid #333 !important;
+            border-bottom: 2px solid #333 !important;
+            padding: 8px 0 !important;
+            margin-top: 10px !important;
+            font-weight: bold !important;
+            font-size: 14px !important;
+            background: #f5f5f5 !important;
+        }
+
+    .payment-info {
+        margin-top: 20px !important;
+        padding: 15px !important;
+        border: 1px solid #333 !important;
+        background: #f9f9f9 !important;
+    }
+
+    .payment-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        margin: 3px 0 !important;
+        font-size: 11px !important;
+    }
+
+    .status-paid {
+        font-weight: bold !important;
+        color: #4CAF50 !important;
+        font-size: 12px !important;
+        text-transform: uppercase !important;
+    }
+
+    /* Footer */
+    .receipt-footer {
+        margin-top: 30px !important;
+        border-top: 2px solid #333 !important;
+        padding-top: 20px !important;
+        page-break-inside: avoid !important;
+    }
+
+    .footer-notes h5 {
+        font-size: 12px !important;
+        margin: 0 0 10px 0 !important;
+        text-transform: uppercase !important;
+        color: #333 !important;
+    }
+
+    .footer-notes-list {
+        font-size: 10px !important;
+        margin: 0 !important;
+        padding-left: 20px !important;
+        line-height: 1.5 !important;
+    }
+
+        .footer-notes-list li {
+            margin-bottom: 4px !important;
+        }
+
+    .contact-info {
+        margin-top: 20px !important;
+        padding: 10px !important;
+        background: #f5f5f5 !important;
+        border-left: 4px solid #333 !important;
+    }
+
+        .contact-info h5 {
+            font-size: 12px !important;
+            margin: 0 0 8px 0 !important;
+            color: #333 !important;
+        }
+
+        .contact-info div {
+            font-size: 10px !important;
+            margin-bottom: 3px !important;
+            color: #666 !important;
+        }
+
+    .receipt-signature {
+        text-align: center !important;
+        margin-top: 30px !important;
+        padding: 20px 0 !important;
+        border-top: 2px solid #333 !important;
+        border-bottom: 2px solid #333 !important;
+    }
+
+    .signature-label {
+        font-size: 14px !important;
+        font-weight: bold !important;
+        margin-bottom: 8px !important;
+        color: #333 !important;
+        text-transform: uppercase !important;
+    }
+
+    .signature-date {
+        font-size: 10px !important;
+        color: #666 !important;
+        font-style: italic !important;
+    }
+
+    /* Page breaks */
+    .page-break {
+        page-break-before: always !important;
+    }
+
+    .avoid-break {
+        page-break-inside: avoid !important;
+    }
+
+    /* Utility classes */
+    .text-center {
+        text-align: center !important;
+    }
+
+    .text-right {
+        text-align: right !important;
+    }
+
+    .text-left {
+        text-align: left !important;
+    }
+
+    .font-bold {
+        font-weight: bold !important;
+    }
+
+    .text-small {
+        font-size: 9px !important;
+    }
+
+    .text-large {
+        font-size: 15px !important;
+    }
+
+    .uppercase {
+        text-transform: uppercase !important;
+    }
+
+    .lowercase {
+        text-transform: lowercase !important;
+    }
+
+    .italic {
+        font-style: italic !important;
+    }
+
+    /* Borders and spacing */
+    .border-top {
+        border-top: 1px solid #333 !important;
+    }
+
+    .border-bottom {
+        border-bottom: 1px solid #333 !important;
+    }
+
+    .border-left {
+        border-left: 1px solid #333 !important;
+    }
+
+    .border-right {
+        border-right: 1px solid #333 !important;
+    }
+
+    .border-all {
+        border: 1px solid #333 !important;
+    }
+
+    .margin-top {
+        margin-top: 15px !important;
+    }
+
+    .margin-bottom {
+        margin-bottom: 15px !important;
+    }
+
+    .padding-all {
+        padding: 10px !important;
+    }
+
+    /* QR Code and barcodes */
+    .qr-code-section {
+        text-align: center !important;
+        margin: 20px 0 !important;
+        page-break-inside: avoid !important;
+    }
+
+    .qr-code,
+    .barcode {
+        display: inline-block !important;
+        border: 2px solid #333 !important;
+        background: white !important;
+    }
+
+    .qr-placeholder {
+        width: 80px !important;
+        height: 80px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 10px !important;
+        font-weight: bold !important;
+    }
+
+    .qr-label {
+        font-size: 10px !important;
+        margin-top: 8px !important;
+        color: #666 !important;
+        font-style: italic !important;
+    }
+
+    /* Override any remaining colors for print */
+    * {
+        background: white !important;
+        color: #333 !important;
+    }
+
+    .positive {
+        color: #2e7d2e !important;
+    }
+
+    .negative {
+        color: #c41e3a !important;
+    }
+
+    .text-primary {
+        color: #1a73e8 !important;
+    }
+
+    .text-secondary {
+        color: #666 !important;
+    }
+
+    .text-muted {
+        color: #999 !important;
+    }
+}
+
+/* Print preview styles (for screen) */
+@media screen {
+    .print-preview {
+        background: #f5f5f5;
+        padding: 20px;
+    }
+
+        .print-preview .print-area {
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            box-sizing: border-box;
+        }
+}

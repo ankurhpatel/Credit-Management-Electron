@@ -147,7 +147,7 @@ class Forms {
         }
     }
 
-    // FIXED handleAddSubscription method
+    // FIXED handleAddSubscription method with MAC address support
     static async handleAddSubscription(event) {
         event.preventDefault();
         console.log('📝 Processing subscription form submission...');
@@ -177,6 +177,7 @@ class Forms {
                 creditsSelected: formData.get('creditsSelected'),
                 amountPaid: formData.get('amountPaid'),
                 classification: formData.get('classification'),
+                macAddress: formData.get('macAddress'),
                 notes: formData.get('notes'),
                 status: formData.get('status')
             });
@@ -191,7 +192,8 @@ class Forms {
                 vendorID: vendorID,
                 vendorServiceName: formData.get('vendorServiceName'),
                 notes: formData.get('notes') || '',
-                classification: formData.get('classification') || ''
+                classification: formData.get('classification') || '',
+                macAddress: formData.get('macAddress') || ''  // NEW LINE ADDED
             };
 
             // Enhanced client-side validation
@@ -223,6 +225,11 @@ class Forms {
 
             if (!subscriptionData.amountPaid || subscriptionData.amountPaid <= 0) {
                 validationErrors.push('Please enter a valid payment amount (greater than $0)');
+            }
+
+            // MAC address validation (optional but must be valid format if provided)
+            if (subscriptionData.macAddress && !Validators.validateMacAddress(subscriptionData.macAddress)) {
+                validationErrors.push('MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX');
             }
 
             // Check if start date is not in the future beyond reasonable limits
@@ -436,6 +443,12 @@ class Forms {
                     errorMessage = `Value must be at least ${input.getAttribute('min')}`;
                 }
                 break;
+        }
+
+        // MAC address validation for macAddress fields
+        if (input.name === 'macAddress') {
+            isValid = Validators.validateMacAddress(input.value);
+            errorMessage = 'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX';
         }
 
         // Apply error styling if needed

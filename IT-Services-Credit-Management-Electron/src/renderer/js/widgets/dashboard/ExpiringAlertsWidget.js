@@ -9,20 +9,42 @@
         try {
             this.log('Loading expiring subscriptions...');
 
-            // Use correct port 3001 for API calls
-            const API_BASE = 'http://localhost:3001/api';
+            // Use IPC instead of HTTP fetch
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
 
-            const [weeklyResponse, monthlyResponse] = await Promise.all([
-                fetch(`${API_BASE}/subscriptions/weekly-expiring`),
-                fetch(`${API_BASE}/subscriptions/monthly-expiring`)
-            ]);
+                // Get expiring subscriptions via IPC
+                const expiringData = await ipcRenderer.invoke('db-get-expiring-subscriptions');
 
-            if (!weeklyResponse.ok || !monthlyResponse.ok) {
-                throw new Error('Failed to fetch expiring subscriptions');
+                this.weeklyExpiring = expiringData.weeklyExpiring || [];
+                this.monthlyExpiring = expiringData.monthlyExpiring || [];
+            } else {
+                // Fallback mock data for browser testing
+                this.weeklyExpiring = [
+                    {
+                        id: 1,
+                        customer_name: 'John Doe',
+                        service_name: 'Premium IPTV',
+                        expiration_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+                        classification: 'Premium',
+                        credits_used: 12,
+                        amount_paid: 120,
+                        customer_email: 'john@example.com'
+                    }
+                ];
+                this.monthlyExpiring = [
+                    {
+                        id: 2,
+                        customer_name: 'Jane Smith',
+                        service_name: 'Basic IPTV',
+                        expiration_date: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+                        classification: 'Basic',
+                        credits_used: 6,
+                        amount_paid: 60,
+                        customer_email: 'jane@example.com'
+                    }
+                ];
             }
-
-            this.weeklyExpiring = await weeklyResponse.json();
-            this.monthlyExpiring = await monthlyResponse.json();
 
             this.log(`Loaded ${this.weeklyExpiring.length} weekly and ${this.monthlyExpiring.length} monthly expiring subscriptions`);
         } catch (error) {
@@ -45,6 +67,11 @@
                 <div class="expiring-list" id="monthlyExpiringList">
                     ${this.getExpiringList(this.monthlyExpiring, false)}
                 </div>
+                
+                <div class="alerts-footer">
+                    <small>Last updated: ${new Date().toLocaleString()}</small>
+                    <button class="btn-refresh" onclick="window.widgetManager?.getWidget('dashboard-alerts')?.refresh()">🔄 Refresh</button>
+                </div>
             </div>
         `;
     }
@@ -52,7 +79,7 @@
     getExpiringList(subscriptions, isCritical = false) {
         if (!subscriptions || subscriptions.length === 0) {
             const message = isCritical ? 'No subscriptions expiring this week' : 'No subscriptions expiring this month';
-            return `<div class="no-expiring">${message}</div>`;
+            return `<div class="no-expiring">${message} ✅</div>`;
         }
 
         return subscriptions.map(sub => {
@@ -67,7 +94,7 @@
                         <div class="expiring-date">
                             Expires: ${this.formatDate(sub.expiration_date)}
                         </div>
-                        <div class="expiring-countdown">
+                        <div class="expiring-countdown ${daysUntilExpiry <= 3 ? 'urgent' : ''}">
                             ${daysUntilExpiry} days remaining
                         </div>
                         <div class="expiring-info">
@@ -96,7 +123,8 @@
         const today = new Date();
         const expiry = new Date(expirationDate);
         const diffTime = expiry - today;
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return Math.max(0, days); // Don't return negative days
     }
 
     async onAfterRender() {
@@ -107,21 +135,24 @@
         // Handle renew subscription
         window.renewSubscription = (subscriptionId) => {
             console.log('Renewing subscription:', subscriptionId);
-            // Navigate to customers tab
-            if (window.WidgetManager && window.WidgetManager.showTab) {
-                window.WidgetManager.showTab('customers');
-            }
+            this.showNotification('Renewal Started', `Processing renewal for subscription ${subscriptionId}`, 'info');
+            // You can add actual renewal logic here
         };
 
         // Handle contact customer
         window.contactCustomer = (customerEmail) => {
             if (!customerEmail) {
-                console.warn('No email provided for customer contact');
+                this.showNotification('Contact Error', 'No email address available for this customer', 'warning');
                 return;
             }
             console.log('Contacting customer:', customerEmail);
-            window.open(`mailto:${customerEmail}?subject=Subscription Renewal Reminder`);
+            window.open(`mailto:${customerEmail}?subject=Subscription Renewal Reminder&body=Dear Customer,%0D%0A%0D%0AYour subscription is expiring soon. Please contact us to renew.%0D%0A%0D%0ABest regards,%0D%0AIT Services Team`);
         };
+    }
+
+    showNotification(title, message, type = 'info') {
+        // Simple notification
+        console.log(`📢 ${type.toUpperCase()}: ${title} - ${message}`);
     }
 }
 

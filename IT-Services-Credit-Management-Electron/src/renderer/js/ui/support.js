@@ -53,8 +53,10 @@ class SupportUI {
     }
 
     static clear() {
-        document.getElementById('globalSupportSearch').value = '';
-        document.getElementById('supportSearchResults').style.display = 'none';
+        const input = document.getElementById('globalSupportSearch');
+        const results = document.getElementById('supportSearchResults');
+        if (input) input.value = '';
+        if (results) results.style.display = 'none';
     }
 
     static openInPOS(customerId) {

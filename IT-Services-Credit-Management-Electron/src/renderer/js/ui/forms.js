@@ -347,6 +347,15 @@ class Forms {
         }
     }
 
+    static async handleLoadLifetimePL() {
+        try {
+            const result = await PLReportsAPI.loadLifetime();
+            ReportUI.displayLifetimePL(result);
+        } catch (error) {
+            // Error already handled
+        }
+    }
+
     static calculateExpirationDate() {
         const startDateInput = document.querySelector('input[name="startDate"]');
         const creditsInput = document.querySelector('input[name="creditsSelected"]');
@@ -522,6 +531,10 @@ function loadMonthlyPL(event) {
 
 function loadYearlyPL(event) {
     Forms.handleLoadYearlyPL(event);
+}
+
+function loadLifetimePL() {
+    Forms.handleLoadLifetimePL();
 }
 
 function calculateExpirationDate() {

@@ -140,6 +140,23 @@ class DatabaseManager {
                 console.log('📝 Adding internal_notes to customers...');
                 this.db.exec("ALTER TABLE customers ADD COLUMN internal_notes TEXT");
             }
+
+            // FORCE CHECK: Ensure settings table exists for existing databases
+            const settingsTableCheck = this.db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'");
+            if (settingsTableCheck.length === 0) {
+                console.log('⚙️ Creating missing settings table...');
+                this.db.exec(`
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT
+                    );
+                    INSERT OR IGNORE INTO settings (key, value) VALUES 
+                    ('company_name', 'IT Services Management'),
+                    ('receipt_instructions', 'No refunds on activated digital services. Hardware warranty valid for 6 months.'),
+                    ('company_logo', ''),
+                    ('currency_symbol', '$');
+                `);
+            }
             
             console.log('✅ Schema updates completed');
         } catch (error) {
@@ -160,7 +177,14 @@ class DatabaseManager {
             if (count === 0) {
                 console.log('📋 Creating database tables...');
                 await this.createTables();
-                console.log('✅ Database tables created successfully');
+                this.db.exec(`
+                    INSERT OR IGNORE INTO settings (key, value) VALUES 
+                    ('company_name', 'IT Services Management'),
+                    ('receipt_instructions', 'No refunds on activated digital services. Hardware warranty valid for 6 months.'),
+                    ('company_logo', ''),
+                    ('currency_symbol', '$')
+                `);
+                console.log('✅ Database tables created and defaults set');
             } else {
                 console.log('✅ Database tables already exist');
             }
@@ -274,6 +298,11 @@ class DatabaseManager {
                 description TEXT,
                 transaction_date TEXT DEFAULT (date('now')),
                 created_date TEXT DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);

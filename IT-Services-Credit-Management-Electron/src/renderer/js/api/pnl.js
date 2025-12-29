@@ -3,21 +3,10 @@ class PLReportsAPI {
     static async loadMonthly(month, year) {
         try {
             console.log(`📊 Loading monthly P&L for ${month}/${year}...`);
-
-            if (!month || !year) {
-                throw new Error('Month and Year are required');
-            }
-
-            const response = await fetch(`/api/pl/monthly?month=${month}&year=${year}`);
+            const response = await fetch(`/api/pl/summary?type=monthly&month=${month}&year=${year}`);
             const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to load monthly P&L');
-            }
-
-            console.log('✅ Monthly P&L loaded successfully');
+            if (!response.ok) throw new Error(result.error || 'Failed to load monthly P&L');
             return result;
-
         } catch (error) {
             console.error('❌ Error loading monthly P&L:', error);
             Alerts.showError('P&L Loading Error', error.message);
@@ -28,23 +17,26 @@ class PLReportsAPI {
     static async loadYearly(year) {
         try {
             console.log(`📊 Loading yearly P&L for ${year}...`);
-
-            if (!year) {
-                throw new Error('Year is required');
-            }
-
-            const response = await fetch(`/api/pl/yearly?year=${year}`);
+            const response = await fetch(`/api/pl/summary?type=yearly&year=${year}`);
             const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to load yearly P&L');
-            }
-
-            console.log('✅ Yearly P&L loaded successfully');
+            if (!response.ok) throw new Error(result.error || 'Failed to load yearly P&L');
             return result;
-
         } catch (error) {
             console.error('❌ Error loading yearly P&L:', error);
+            Alerts.showError('P&L Loading Error', error.message);
+            throw error;
+        }
+    }
+
+    static async loadLifetime() {
+        try {
+            console.log(`📊 Loading lifetime P&L...`);
+            const response = await fetch(`/api/pl/summary?type=lifetime`);
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to load lifetime P&L');
+            return result;
+        } catch (error) {
+            console.error('❌ Error loading lifetime P&L:', error);
             Alerts.showError('P&L Loading Error', error.message);
             throw error;
         }

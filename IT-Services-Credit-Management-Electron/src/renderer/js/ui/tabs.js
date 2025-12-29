@@ -244,7 +244,7 @@ class Tabs {
 
             // Validate tab name
             const validTabs = [
-                'pos', 'dashboard', 'pnl', 'credits', 'customers', 'vendors', 'business', 'transactions'
+                'pos', 'dashboard', 'pnl', 'credits', 'customers', 'vendors', 'business', 'transactions', 'settings'
             ];
 
             if (!validTabs.includes(tabName)) {
@@ -347,7 +347,8 @@ class Tabs {
             'customers': '👥 Customer Management',
             'vendors': '🏭 Vendor Management',
             'business': '💼 Business Management',
-            'transactions': '📊 Transaction History'
+            'transactions': '📊 Transaction History',
+            'settings': '⚙️ Settings'
         };
 
         const expectedText = tabNameMap[tabName];
@@ -415,6 +416,12 @@ class Tabs {
                 case 'pos':
                     if (window.POSUI) {
                         POSUI.init();
+                    }
+                    break;
+
+                case 'settings':
+                    if (window.SettingsUI) {
+                        await SettingsUI.init();
                     }
                     break;
 
@@ -645,7 +652,8 @@ class Tabs {
             'customers': '👥 Customer Management',
             'vendors': '🏭 Vendor Management',
             'business': '💼 Business Management',
-            'transactions': '📊 Transaction History'
+            'transactions': '📊 Transaction History',
+            'settings': '⚙️ Settings'
         };
 
         const title = tabTitles[tabName] || tabName;

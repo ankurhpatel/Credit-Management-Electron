@@ -338,24 +338,16 @@ class PrintManager {
     // NEW: Print vendor transaction receipt
     static async printVendorTransaction(transactionId) {
         try {
-            console.log(`🖨️ Printing vendor transaction: ${transactionId}`);
+            console.log(`🖨️ Preparing vendor purchase record: ${transactionId}`);
 
-            // Find transaction in loaded data (or fetch if needed, but usually loaded)
-            let transaction = TransactionUI.allVendorTransactions.find(t => 
-                (t.transaction_id || t.id || t.ID) == transactionId
+            // Fetch latest data to ensure accuracy
+            const allTrans = await CreditsAPI.loadVendorTransactions();
+            const transaction = allTrans.find(t => 
+                (t.transaction_id || t.id || t.ID).toString() === transactionId.toString()
             );
-            
-            if (!transaction) {
-                // Try fetching if not found locally
-                const allTrans = await CreditsAPI.loadVendorTransactions();
-                transaction = allTrans.find(t => 
-                    (t.transaction_id || t.id || t.ID) == transactionId
-                );
-            }
 
             if (!transaction) {
-                Alerts.showError('Error', 'Vendor transaction not found');
-                return;
+                throw new Error('Purchase record not found in database.');
             }
 
             // Create a temporary container
@@ -364,42 +356,40 @@ class PrintManager {
             tempContainer.style.display = 'none';
             document.body.appendChild(tempContainer);
 
-            // Build HTML for vendor receipt
+            // Build HTML for vendor receipt using global Formatters
             const html = `
                 <div class="customer-receipt">
                     <div class="receipt-header">
                         <h3>🏭 Vendor Purchase Record</h3>
                         <div class="receipt-info">
-                            <p><strong>Vendor:</strong> ${transaction.vendor_name || transaction.VendorName}</p>
-                            <p><strong>Date:</strong> ${TransactionUI.formatDate(transaction.purchase_date || transaction.PurchaseDate)}</p>
-                            <p><strong>Transaction ID:</strong> ${transaction.transaction_id || transaction.id || transaction.ID}</p>
+                            <p><strong>Vendor:</strong> ${transaction.vendor_name || 'Unknown Vendor'}</p>
+                            <p><strong>Date:</strong> ${Formatters.formatDate(transaction.purchase_date)}</p>
+                            <p><strong>Record ID:</strong> ${transaction.transaction_id || transaction.id}</p>
                         </div>
                     </div>
 
-                    <div class="receipt-summary">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span>Service:</span>
-                            <strong>${transaction.service_name || transaction.ServiceName}</strong>
+                    <div class="receipt-summary" style="background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <span>Product/Service:</span>
+                            <strong style="color: #2d3748;">${transaction.service_name}</strong>
                         </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span>Credits Purchased:</span>
-                            <strong>${TransactionUI.formatNumber(transaction.credits || transaction.Credits)}</strong>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <span>Quantity / Units:</span>
+                            <strong style="color: #2d3748;">${Formatters.formatNumber(transaction.credits)}</strong>
                         </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-top: 1px solid #ccc; padding-top: 10px;">
-                            <span>Total Cost (USD):</span>
-                            <strong style="font-size: 1.2em;">${TransactionUI.formatCurrency(transaction.price_usd || transaction.PriceUSD)}</strong>
+                        <div style="display: flex; justify-content: space-between; margin-top: 15px; border-top: 2px solid #cbd5e0; padding-top: 15px;">
+                            <span style="font-weight: 700;">Total Cost (USD):</span>
+                            <strong style="font-size: 1.4em; color: #2d3748;">${Formatters.formatCurrency(transaction.price_usd)}</strong>
                         </div>
-                        ${(transaction.notes || transaction.Notes) ? `
-                            <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
-                                <strong>Notes:</strong><br>
-                                ${transaction.notes || transaction.Notes}
+                        ${transaction.notes ? `
+                            <div style="margin-top: 20px; padding: 10px; background: #fff; border-left: 4px solid #667eea; font-size: 0.9em; color: #4a5568;">
+                                <strong>Notes:</strong><br>${transaction.notes}
                             </div>
                         ` : ''}
                     </div>
 
-                    <div class="receipt-footer">
-                        <p>Internal Record - Not for Resale</p>
-                        <p>Thank you for your business!</p>
+                    <div class="receipt-footer" style="margin-top: 40px; text-align: center; color: #718096; font-style: italic;">
+                        <p>Internal Inventory Record - IT Services Management</p>
                     </div>
                 </div>
             `;
@@ -407,9 +397,7 @@ class PrintManager {
             tempContainer.innerHTML = html;
 
             // Print the receipt
-            const vendorName = transaction.vendor_name || transaction.VendorName || 'Vendor';
-            const receiptTitle = `Purchase Record - ${vendorName} - ${TransactionUI.formatDate(transaction.purchase_date || transaction.PurchaseDate)}`;
-            await this.printContent('temp-vendor-receipt-container', receiptTitle);
+            await this.printContent('temp-vendor-receipt-container', `Vendor Purchase - ${transaction.vendor_name}`);
 
             // Clean up
             setTimeout(() => {
@@ -419,8 +407,8 @@ class PrintManager {
             }, 2000);
 
         } catch (error) {
-            console.error('❌ Error printing vendor transaction:', error);
-            Alerts.showError('Print Error', 'Failed to print vendor transaction record');
+            console.error('❌ Vendor Print Error:', error);
+            Alerts.showError('Print Error', 'Failed to generate vendor record: ' + error.message);
         }
     }
 
@@ -651,20 +639,29 @@ class PrintManager {
 
             // Load customer transaction data
             const data = await CustomersAPI.loadTransactions(customerId);
+            const customer = await (await fetch(`/api/customers/${customerId}`)).json();
 
-            // Create a temporary container for the receipt
+            if (!data.subscriptions || data.subscriptions.length === 0) {
+                Alerts.showError('No Data', 'No transactions found for this customer');
+                return;
+            }
+
+            const fullData = {
+                customer: customer,
+                subscriptions: data.subscriptions,
+                summary: {
+                    totalPaid: data.subscriptions.reduce((sum, sub) => sum + parseFloat(sub.amount_paid || 0), 0)
+                }
+            };
+
             const tempContainer = document.createElement('div');
             tempContainer.id = 'temp-receipt-container';
             tempContainer.style.display = 'none';
             document.body.appendChild(tempContainer);
 
-            // Render the receipt
-            ReceiptUI.renderCustomerReceipt(data, tempContainer);
+            ReceiptUI.renderCustomerReceipt(fullData, tempContainer);
+            await this.printContent('temp-receipt-container', `Customer Receipt - ${customer.name}`);
 
-            // Print the receipt
-            await this.printContent('temp-receipt-container', `Customer Receipt - ${data.customer.name || data.customer.Name}`);
-
-            // Clean up
             setTimeout(() => {
                 if (document.body.contains(tempContainer)) {
                     document.body.removeChild(tempContainer);
@@ -674,6 +671,49 @@ class PrintManager {
         } catch (error) {
             console.error('❌ Error printing customer receipt:', error);
             Alerts.showError('Print Error', 'Failed to print customer receipt');
+        }
+    }
+
+    // NEW: Print single transaction receipt
+    static async printSingleTransaction(customerId, subscriptionId) {
+        try {
+            console.log(`🖨️ Printing single transaction: ${subscriptionId} for customer ${customerId}`);
+
+            const customer = await (await fetch(`/api/customers/${customerId}`)).json();
+            const data = await CustomersAPI.loadTransactions(customerId);
+            const subscription = data.subscriptions.find(sub => sub.id === subscriptionId);
+
+            if (!subscription) {
+                Alerts.showError('Error', 'Transaction not found');
+                return;
+            }
+
+            const singleData = {
+                customer: customer,
+                subscriptions: [subscription],
+                summary: {
+                    totalPaid: parseFloat(subscription.amount_paid || 0)
+                }
+            };
+
+            const tempContainer = document.createElement('div');
+            tempContainer.id = 'temp-single-receipt-container';
+            tempContainer.style.display = 'none';
+            document.body.appendChild(tempContainer);
+
+            ReceiptUI.renderCustomerReceipt(singleData, tempContainer);
+            const serviceName = subscription.service_name || 'Service';
+            await this.printContent('temp-single-receipt-container', `Receipt - ${serviceName} - ${customer.name}`);
+
+            setTimeout(() => {
+                if (document.body.contains(tempContainer)) {
+                    document.body.removeChild(tempContainer);
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('❌ Error printing single transaction:', error);
+            Alerts.showError('Print Error', 'Failed to print transaction receipt');
         }
     }
 

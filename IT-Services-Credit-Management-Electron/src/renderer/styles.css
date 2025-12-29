@@ -176,7 +176,7 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 15px;
-    align-items: end;
+    align-items: flex-end;
     margin-bottom: 20px;
 }
 
@@ -184,6 +184,7 @@ body {
         display: flex;
         flex-direction: column;
         gap: 5px;
+        margin-bottom: 0;
     }
 
     .form-inline label {
@@ -625,10 +626,11 @@ body {
 }
 
 .dropdown-item {
-    padding: 12px 16px;
+    padding: 15px 20px;
     cursor: pointer;
     border-bottom: 1px solid #f7fafc;
     transition: background-color 0.2s ease;
+    font-size: 15px;
 }
 
     .dropdown-item:hover {
@@ -1347,6 +1349,24 @@ body {
     margin-bottom: 10px;
 }
 
+#posCustomerSearch {
+    width: 100%;
+    display: block;
+    padding: 15px 20px;
+    font-size: 16px;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background: white;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+#posCustomerSearch:focus {
+    border-color: #764ba2;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+}
+
 .selected-customer-card {
     background: #ebf8ff;
     border: 1px solid #bee3f8;
@@ -1994,10 +2014,19 @@ body {
         page-break-inside: avoid;
     }
 
-    /* Credit balances */
-    .credit-balance-item {
-        background: white !important;
-        border: 1px solid #ddd !important;
+    .font-bold {
+    font-weight: 700;
+}
+
+.pnl-breakdown-box h5 {
+    border-bottom: 1px solid #edf2f7;
+    padding-bottom: 8px;
+    font-weight: 700;
+}
+
+.pnl-breakdown-box span {
+    font-size: 14px;
+}
         border-radius: 0 !important;
         padding: 15px !important;
         margin-bottom: 15px !important;

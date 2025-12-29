@@ -146,7 +146,7 @@ class POSUI {
 
             // 6. Fill Footer UI
             document.getElementById('posOrderStatus').value = items[0].order_status || 'Open';
-            document.getElementById('posPaymentType').value = items[0].payment_type || 'Cash';
+            document.getElementById('posPaymentType').value = items[0].payment_type || 'Other';
             document.getElementById('posPaymentStatus').value = items[0].payment_status || 'Pending';
             document.getElementById('posTransactionIdRef').value = items[0].transaction_id_ref || '';
             document.getElementById('posOrderNotes').value = (items[0].notes || '').replace('POS: ', '');

@@ -45,16 +45,20 @@ async function loadInitialData() {
     try {
         console.log('📊 Loading initial data...');
 
-        // Load customers and vendors first (needed for dropdowns)
+        // Load settings and data (needed for branding and dropdowns)
         await Promise.all([
+            SettingsAPI.load(),
             CustomersAPI.loadAll(),
             VendorsAPI.loadAll()
         ]);
-
-        // Load dashboard data
-        await DashboardUI.loadStats();
         
-        // Setup year dropdowns
+        // Apply global branding
+        if (window.SettingsUI) SettingsUI.applyGlobalSettings();
+
+        // Load dashboard data (Initializes filters + loads stats)
+        await DashboardUI.init();
+        
+        // Setup year dropdowns for P&L
         PLReportsAPI.populateYearDropdowns();
 
         console.log('✅ Initial data loaded');

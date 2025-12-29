@@ -10,6 +10,7 @@ class Store {
         businessTransactions: [],
         businessBalance: 0,
         dashboardStats: {},
+        settings: {},
         currentTab: 'dashboard'
     };
 
@@ -18,6 +19,17 @@ class Store {
         // Load any saved state from localStorage
         this.loadFromLocalStorage();
         console.log('✅ Application state initialized');
+    }
+
+    // Settings
+    static setSettings(settings) {
+        this.data.settings = settings || {};
+        this.saveToLocalStorage('settings');
+        this.notifyChange('settings', this.data.settings);
+    }
+
+    static getSettings() {
+        return this.data.settings || {};
     }
 
     // Customers

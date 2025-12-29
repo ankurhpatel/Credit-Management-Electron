@@ -10,9 +10,12 @@
 <body>
     <div class="container">
         <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 30px;">
-            <div class="header-logo">
-                <h1>💳 IT Services Management</h1>
-                <p>Proactive POS & Inventory System</p>
+            <div class="header-logo" style="display: flex; align-items: center; gap: 15px;">
+                <img id="headerLogo" style="height: 50px; width: auto; display: none; object-fit: contain;">
+                <div>
+                    <h1>💳 IT Services Management</h1>
+                    <p>Proactive POS & Inventory System</p>
+                </div>
             </div>
 
             <!-- Global Support Search -->
@@ -37,6 +40,7 @@
             <button class="tab-btn" onclick="showTab('vendors')">🏭 Vendor Management</button>
             <button class="tab-btn" onclick="showTab('business')">💼 Business Management</button>
             <button class="tab-btn" onclick="showTab('transactions')">📊 Transaction History</button>
+            <button class="tab-btn" onclick="showTab('settings')">⚙️ Settings</button>
         </nav>
 
         <!-- POS Tab -->
@@ -99,25 +103,25 @@
                                 <div class="form-group">
                                     <label>📑 Order Status:</label>
                                     <select id="posOrderStatus" class="form-select" style="padding: 8px;">
+                                        <option value="Open" selected>📂 Open (Pending)</option>
                                         <option value="Closed">✅ Closed (Fulfilled)</option>
-                                        <option value="Open">📂 Open (Pending)</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label>💳 Payment Type:</label>
                                     <select id="posPaymentType" class="form-select" style="padding: 8px;">
+                                        <option value="Other" selected>Other</option>
                                         <option value="Cash">💵 Cash</option>
                                         <option value="Bank Transfer">🏦 Bank Transfer</option>
                                         <option value="Card">💳 Credit/Debit Card</option>
                                         <option value="Zelle/Venmo">📱 Zelle / Venmo</option>
-                                        <option value="Other">Other</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label>💰 Payment Status:</label>
                                     <select id="posPaymentStatus" class="form-select" style="padding: 8px;">
+                                        <option value="Pending" selected>⏳ Pending / Unpaid</option>
                                         <option value="Paid">✅ Paid</option>
-                                        <option value="Pending">⏳ Pending / Unpaid</option>
                                         <option value="Advance">🎁 Advance Payment</option>
                                     </select>
                                 </div>
@@ -149,107 +153,101 @@
 
         <!-- Dashboard Tab -->
         <div id="dashboard" class="tab-content active">
-            <h2>📊 Dashboard & Analytics</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                <h2 style="margin-bottom: 0; border-bottom: none;">📊 Dashboard & Analytics</h2>
+                <div class="filters" style="display: flex; gap: 10px; align-items: center;">
+                    <select id="dashboardFilterMonth" onchange="DashboardUI.refreshStats()" class="form-select" style="padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <option value="all">All Months</option>
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
 
-            <!-- NEW: Today's Pulse Section -->
-            <h3>⚡ Today's Pulse</h3>
-            <div class="dashboard-stats today-stats">
-                <div class="stat-card pulse" style="border-left: 4px solid #667eea;">
-                    <div class="stat-number" id="todayCash">$0.00</div>
-                    <div class="stat-label">Cash Collected Today</div>
-                </div>
-                <div class="stat-card pulse" style="border-left: 4px solid #48bb78;">
-                    <div class="stat-number" id="todayProfit">$0.00</div>
-                    <div class="stat-label">Estimated Net Today</div>
-                </div>
-                <div class="stat-card pulse" style="border-left: 4px solid #ed8936;">
-                    <div class="stat-number" id="todaySalesCount">0</div>
-                    <div class="stat-label">Orders Today</div>
+                    <select id="dashboardFilterYear" onchange="DashboardUI.refreshStats()" class="form-select" style="padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <option value="all">All Years</option>
+                    </select>
                 </div>
             </div>
 
-            <!-- NEW: Profit Chart Section -->
-            <div class="chart-container-wrapper" style="background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 35px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                    <h3 style="margin: 0;">📈 Profit Trends</h3>
-                    <div class="tab-buttons" style="display: flex; gap: 5px;">
-                        <button class="tab-button active" id="btnMonthlyChart" onclick="DashboardUI.changeChartPeriod('monthly')">Monthly</button>
-                        <button class="tab-button" id="btnYearlyChart" onclick="DashboardUI.changeChartPeriod('yearly')">Yearly</button>
+            <!-- TIER 1: KPI CARDS -->
+            <div class="dashboard-kpi-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
+                <div class="stat-card" style="border-left: 4px solid #667eea; padding: 20px;">
+                    <div class="stat-label" style="font-size: 13px; color: #718096; margin-bottom: 5px;">Total Revenue</div>
+                    <div class="stat-number" id="kpiRevenue" style="font-size: 28px; color: #2d3748;">$0.00</div>
+                </div>
+                <div class="stat-card" style="border-left: 4px solid #48bb78; padding: 20px;">
+                    <div class="stat-label" style="font-size: 13px; color: #718096; margin-bottom: 5px;">Gross Profit</div>
+                    <div class="stat-number" id="kpiGrossProfit" style="font-size: 28px; color: #2d3748;">$0.00</div>
+                </div>
+                <div class="stat-card" style="border-left: 4px solid #ed8936; padding: 20px;">
+                    <div class="stat-label" style="font-size: 13px; color: #718096; margin-bottom: 5px;">Net Margin</div>
+                    <div class="stat-number" id="kpiMargin" style="font-size: 28px; color: #2d3748;">0%</div>
+                </div>
+                <div class="stat-card" style="border-left: 4px solid #4299e1; padding: 20px;">
+                    <div class="stat-label" style="font-size: 13px; color: #718096; margin-bottom: 5px;">Total Orders</div>
+                    <div class="stat-number" id="kpiOrders" style="font-size: 28px; color: #2d3748;">0</div>
+                </div>
+            </div>
+
+            <!-- TIER 2: CHARTS ROW -->
+            <div class="dashboard-charts-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <!-- Profit Trend -->
+                <div class="chart-container" style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <h3 style="margin: 0 0 15px 0; font-size: 16px;">📈 Profit Trends</h3>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="profitChart"></canvas>
                     </div>
                 </div>
-                <div style="height: 350px; position: relative;">
-                    <canvas id="profitChart"></canvas>
+
+                <!-- Revenue Mix -->
+                <div class="chart-container" style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <h3 style="margin: 0 0 15px 0; font-size: 16px;">🍩 Revenue Mix</h3>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="mixChart"></canvas>
+                    </div>
                 </div>
             </div>
 
-            <!-- Dashboard Stats -->
-            <h3>🏢 Lifetime Overview</h3>
-            <div class="dashboard-stats">
-                <div class="stat-card" style="background: #ebf4ff;">
-                    <div class="stat-number" id="revenueCredits">$0.00</div>
-                    <div class="stat-label">Credit Sales Income</div>
+            <!-- TIER 3: LISTS ROW -->
+            <div class="dashboard-lists-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Top 5 Performers -->
+                <div class="list-panel" style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0 0 15px 0; font-size: 16px;">🏆 Top 5 Profitable Items</h3>
+                    <table class="simple-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #edf2f7; text-align: left;">
+                                <th style="padding: 8px; font-size: 12px; color: #718096;">Item</th>
+                                <th style="padding: 8px; font-size: 12px; color: #718096; text-align: right;">Units</th>
+                                <th style="padding: 8px; font-size: 12px; color: #718096; text-align: right;">Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topItemsList"></tbody>
+                    </table>
                 </div>
-                <div class="stat-card" style="background: #f0fff4;">
-                    <div class="stat-number" id="revenueHardware">$0.00</div>
-                    <div class="stat-label">Hardware Income</div>
-                </div>
-                <div class="stat-card" style="background: #fffaf0;">
-                    <div class="stat-number" id="revenueFees">$0.00</div>
-                    <div class="stat-label">Service/Fee Income</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalCustomers">-</div>
-                    <div class="stat-label">Total Customers</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalCreditsUsed">-</div>
-                    <div class="stat-label">Units/Months Sold</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="netProfitFromCreditSales">$-</div>
-                    <div class="stat-label">Net Profit from Sales</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="avgProfitPerCredit">$-</div>
-                    <div class="stat-label">Profit per Unit</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="avgRevenuePerCredit">$-</div>
-                    <div class="stat-label">Revenue per Unit</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="avgCostPerCredit">$-</div>
-                    <div class="stat-label">Cost per Unit</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalRevenue">$-</div>
-                    <div class="stat-label">Total Revenue</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalVendorCosts">$-</div>
-                    <div class="stat-label">Inventory Costs</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="finalNetProfit">$-</div>
-                    <div class="stat-label">Final Net Profit</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalCreditsRemaining">-</div>
-                    <div class="stat-label">In Stock (Total)</div>
-                </div>
-                <div class="stat-card alert" id="lowCreditAlertsCard">
-                    <div class="stat-number" id="lowCreditAlerts">-</div>
-                    <div class="stat-label">⚠️ Low Stock Alerts</div>
-                </div>
-            </div>
 
-            <!-- Expiring Subscriptions Alerts -->
-            <div class="expiring-alerts">
-                <h3>⚠️ Expiring This Week</h3>
-                <div id="weeklyExpiringList" class="expiring-list"></div>
-
-                <h3>📅 Expiring This Month</h3>
-                <div id="monthlyExpiringList" class="expiring-list"></div>
+                <!-- Action Items -->
+                <div class="list-panel" style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0 0 15px 0; font-size: 16px;">⚠️ Action Needed</h3>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="font-size: 14px; color: #e53e3e; margin-bottom: 10px;">📉 Low Stock Alerts</h4>
+                        <div id="lowStockList"></div>
+                    </div>
+                    
+                    <div>
+                        <h4 style="font-size: 14px; color: #ed8936; margin-bottom: 10px;">📅 Expiring Soon</h4>
+                        <div id="expiringList"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -260,6 +258,7 @@
             <div class="pnl-tabs">
                 <button class="tab-button active" onclick="showPLTab('monthly')">📅 Monthly</button>
                 <button class="tab-button" onclick="showPLTab('yearly')">📆 Yearly</button>
+                <button class="tab-button" onclick="showPLTab('lifetime'); loadLifetimePL();">🏢 Lifetime</button>
             </div>
 
             <!-- Monthly P&L Tab -->
@@ -303,6 +302,12 @@
                     <button type="submit" class="btn-primary">📊 Load Yearly P&L</button>
                 </form>
                 <div id="yearlyPLResult" class="results-container"></div>
+            </div>
+
+            <!-- Lifetime P&L Tab -->
+            <div id="lifetime" class="pnl-tab-content">
+                <h3>🏢 All-Time Business Performance</h3>
+                <div id="lifetimePLResult" class="results-container"></div>
             </div>
 
             <!-- Credit Balances in P&L Tab -->
@@ -783,6 +788,84 @@
                 <div id="customerPagination" class="pagination-controls" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px; align-items: center;"></div>
             </div>
         </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <h2>⚙️ System Settings</h2>
+            
+            <div class="customer-tabs">
+                <button class="tab-button active" onclick="showSettingsTab('app-settings')">🖥️ App Settings</button>
+                <button class="tab-button" onclick="showSettingsTab('receipt-settings')">🧾 Receipt Settings</button>
+            </div>
+
+            <!-- App Settings -->
+            <div id="app-settings" class="settings-section active">
+                <form onsubmit="saveAppSettings(event)" class="form">
+                    <div class="form-group">
+                        <label>🏢 Company Name:</label>
+                        <input type="text" id="settingCompanyName" required placeholder="Your Business Name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🖼️ Company Logo:</label>
+                        <div style="display: flex; gap: 20px; align-items: flex-start;">
+                            <div id="logoPreviewContainer" style="width: 150px; height: 150px; border: 2px dashed #cbd5e0; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc; overflow: hidden;">
+                                <img id="logoPreview" style="max-width: 100%; max-height: 100%; display: none;">
+                                <span id="logoPlaceholder" style="color: #a0aec0; font-size: 12px; text-align: center;">No Logo<br>Selected</span>
+                            </div>
+                            <div style="flex: 1;">
+                                <input type="file" id="settingLogoFile" accept="image/*" onchange="SettingsUI.previewLogo(event)" style="margin-bottom: 10px;">
+                                <small>Upload your logo (PNG/JPG). It will appear on all receipts and the dashboard.</small>
+                                <button type="button" onclick="SettingsUI.clearLogo()" class="btn-small btn-danger" style="display: block; margin-top: 10px;">Remove Logo</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">💾 Save App Settings</button>
+                </form>
+            </div>
+
+            <!-- Receipt Settings -->
+            <div id="receipt-settings" class="settings-section" style="display: none;">
+                <form onsubmit="saveReceiptSettings(event)" class="form">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                        <div class="settings-column">
+                            <h3>🏪 Business Details</h3>
+                            <div class="form-group">
+                                <label>📧 Business Email:</label>
+                                <input type="email" id="settingCompanyEmail" placeholder="support@yourbusiness.com">
+                            </div>
+                            <div class="form-group">
+                                <label>📱 Business Phone:</label>
+                                <input type="tel" id="settingCompanyPhone" placeholder="+1 (555) 000-0000">
+                            </div>
+                            <div class="form-group">
+                                <label>🏠 Business Address:</label>
+                                <textarea id="settingCompanyAddress" rows="2" placeholder="123 Business St, City, State"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-column">
+                            <h3>🧾 Invoice Branding</h3>
+                            <div class="form-group">
+                                <label>📝 Footer Instructions (Terms):</label>
+                                <textarea id="settingReceiptInstructions" rows="4" placeholder="Enter warranty info, return policy, etc..."></textarea>
+                                <small>Appears at the very bottom of the receipt.</small>
+                            </div>
+                            <div class="form-group">
+                                <label>💰 Currency Symbol:</label>
+                                <input type="text" id="settingCurrency" value="$" maxlength="5" style="width: 80px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button type="submit" class="btn-primary">💾 Save Receipt Settings</button>
+                        <button type="button" onclick="SettingsUI.showLivePreview()" class="btn-secondary">👁️ Preview Receipt Style</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Load scripts in dependency order -->
@@ -792,13 +875,13 @@
     <script src="js/utils/helpers.js"></script>
     <script src="js/utils/print.js"></script>
     <script src="js/state/store.js"></script>
-    <script src="js/api/alerts.js"></script>
     <script src="js/api/customers.js"></script>
     <script src="js/api/vendors.js"></script>
     <script src="js/api/subscriptions.js"></script>
     <script src="js/api/credits.js"></script>
     <script src="js/api/business.js"></script>
     <script src="js/api/pnl.js"></script>
+    <script src="js/api/settings.js"></script>
     <script src="js/ui/alerts.js"></script>
     <script src="js/ui/dashboard.js"></script>
     <script src="js/ui/tabs.js"></script>
@@ -812,6 +895,7 @@
     <script src="js/ui/customers.js"></script>
     <script src="js/ui/pos.js"></script>
     <script src="js/ui/support.js"></script>
+    <script src="js/ui/settings.js"></script>
     <script src="js/app.js"></script>
 
 </body>

@@ -22,69 +22,10 @@ class Forms {
     }
 
     static setupFormHandlers() {
-        // Customer form
-        const customerForm = document.querySelector('form[onsubmit*="addCustomer"]');
-        if (customerForm) {
-            customerForm.addEventListener('submit', this.handleAddCustomer);
-        }
-
-        // Vendor form
-        const vendorForm = document.querySelector('form[onsubmit*="addVendor"]');
-        if (vendorForm) {
-            vendorForm.addEventListener('submit', this.handleAddVendor);
-        }
-
-        // Subscription form
-        const subscriptionForm = document.querySelector('form[onsubmit*="addSubscription"]');
-        if (subscriptionForm) {
-            subscriptionForm.addEventListener('submit', this.handleAddSubscription);
-        }
-
-        // Vendor service form
-        const serviceForm = document.querySelector('form[onsubmit*="addVendorService"]');
-        if (serviceForm) {
-            serviceForm.addEventListener('submit', this.handleAddVendorService);
-        }
-
-        // Credit purchase form
-        const creditForm = document.querySelector('form[onsubmit*="purchaseCredits"]');
-        if (creditForm) {
-            creditForm.addEventListener('submit', this.handlePurchaseCredits);
-        }
-
-        // Business money forms
-        const addMoneyForm = document.querySelector('form[onsubmit*="addBusinessMoney"]');
-        if (addMoneyForm) {
-            addMoneyForm.addEventListener('submit', this.handleAddBusinessMoney);
-        }
-
-        const withdrawForm = document.querySelector('form[onsubmit*="withdrawBusinessMoney"]');
-        if (withdrawForm) {
-            withdrawForm.addEventListener('submit', this.handleWithdrawBusinessMoney);
-        }
-
-        // Customer update form
-        const updateCustomerForm = document.querySelector('form[onsubmit*="updateCustomer"]');
-        if (updateCustomerForm) {
-            updateCustomerForm.addEventListener('submit', this.handleUpdateCustomer);
-        }
-
-        // P&L forms
-        const monthlyPLForm = document.querySelector('form[onsubmit*="loadMonthlyPL"]');
-        if (monthlyPLForm) {
-            monthlyPLForm.addEventListener('submit', this.handleLoadMonthlyPL);
-        }
-
-        const yearlyPLForm = document.querySelector('form[onsubmit*="loadYearlyPL"]');
-        if (yearlyPLForm) {
-            yearlyPLForm.addEventListener('submit', this.handleLoadYearlyPL);
-        }
-
-        // Setup vendor service dropdown change handler
-        const vendorServiceSelect = document.getElementById('vendorServiceSelectSub');
-        if (vendorServiceSelect) {
-            vendorServiceSelect.addEventListener('change', this.handleVendorServiceChange);
-        }
+        // Form handlers are handled via onsubmit attribute in HTML 
+        // linked to global functions at bottom of this file.
+        // No manual addEventListener needed here to avoid duplicate triggers.
+        console.log('📋 Form handlers verified');
     }
 
     // Form handlers
@@ -308,12 +249,17 @@ class Forms {
         const serviceData = {
             vendorID: formData.get('vendorID'),
             serviceName: formData.get('serviceName'),
-            description: formData.get('description')
+            description: formData.get('description'),
+            itemType: formData.get('itemType'),
+            defaultPrice: formData.get('defaultPrice'),
+            costPrice: formData.get('costPrice')
         };
 
         try {
             await VendorsAPI.addService(serviceData);
             event.target.reset();
+            // Refresh catalog list if visible
+            if (window.VendorsUI) VendorsUI.loadAndDisplayServices();
         } catch (error) {
             // Error already handled in VendorsAPI
         }

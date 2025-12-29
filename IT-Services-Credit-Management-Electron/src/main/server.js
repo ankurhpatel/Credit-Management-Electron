@@ -105,7 +105,7 @@ class EmbeddedServer {
         this.app.post('/api/customers', (req, res) => {
             try {
                 console.log('➕ Creating new customer...');
-                const { name, email, phone, address } = req.body;
+                const { name, email, phone, address, internal_notes } = req.body;
 
                 // Validation
                 if (!name || !email) {
@@ -130,11 +130,11 @@ class EmbeddedServer {
                 const customerId = this.generateId();
 
                 const stmt = this.db.prepare(`
-                    INSERT INTO customers (id, name, email, phone, address, created_date)
-                    VALUES (?, ?, ?, ?, ?, datetime('now'))
+                    INSERT INTO customers (id, name, email, phone, address, internal_notes, created_date)
+                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
                 `);
 
-                const result = stmt.run([customerId, name.trim(), email.trim().toLowerCase(), phone || '', address || '']);
+                const result = stmt.run([customerId, name.trim(), email.trim().toLowerCase(), phone || '', address || '', internal_notes || '']);
 
                 if (result.changes === 0) {
                     throw new Error('Failed to create customer');
@@ -188,7 +188,7 @@ class EmbeddedServer {
         this.app.put('/api/customers/:customerId', (req, res) => {
             try {
                 const { customerId } = req.params;
-                const { name, email, phone, address, status } = req.body;
+                const { name, email, phone, address, status, internal_notes } = req.body;
 
                 console.log(`✏️ Updating customer: ${customerId}`);
 
@@ -214,11 +214,11 @@ class EmbeddedServer {
 
                 const stmt = this.db.prepare(`
                     UPDATE customers 
-                    SET name = ?, email = ?, phone = ?, address = ?, status = ?
+                    SET name = ?, email = ?, phone = ?, address = ?, status = ?, internal_notes = ?
                     WHERE id = ?
                 `);
 
-                const result = stmt.run([name.trim(), email.trim().toLowerCase(), phone || '', address || '', status || 'active', customerId]);
+                const result = stmt.run([name.trim(), email.trim().toLowerCase(), phone || '', address || '', status || 'active', internal_notes || '', customerId]);
 
                 if (result.changes === 0) {
                     return res.status(404).json({ error: 'Customer not found' });
@@ -350,6 +350,7 @@ class EmbeddedServer {
 
                     customerSales[customerName].classifications[classification].push({
                         id: sub.id,
+                        customer_id: sub.customer_id,
                         service_name: sub.service_name,
                         start_date: sub.start_date,
                         expiration_date: sub.expiration_date,
@@ -358,12 +359,23 @@ class EmbeddedServer {
                         mac_address: sub.mac_address || '', // Include MAC address
                         status: sub.status,
                         notes: sub.notes,
+                        item_type: sub.item_type || 'subscription',
+                        bundle_id: sub.bundle_id || null,
+                        payment_type: sub.payment_type || 'Cash',
+                        payment_status: sub.payment_status || 'Paid',
+                        transaction_id_ref: sub.transaction_id_ref || null,
+                        order_status: sub.order_status || 'Closed',
                         created_date: sub.created_date,
                         // Also include alternative property names for compatibility
+                        CustomerID: sub.customer_id,
                         AmountPaid: sub.amount_paid || 0,
                         CreditsUsed: sub.credits_used || 0,
                         StartDate: sub.start_date,
-                        MacAddress: sub.mac_address || ''
+                        MacAddress: sub.mac_address || '',
+                        BundleID: sub.bundle_id || null,
+                        PaymentType: sub.payment_type || 'Cash',
+                        PaymentStatus: sub.payment_status || 'Paid',
+                        OrderStatus: sub.order_status || 'Closed'
                     });
                 });
 
@@ -423,6 +435,12 @@ class EmbeddedServer {
                     return res.status(400).json({ error: 'Vendor name must be at least 2 characters long' });
                 }
 
+                // Deduplication Check (Case-insensitive)
+                const existing = this.db.prepare('SELECT vendor_id FROM vendors WHERE LOWER(name) = LOWER(?)').get([name.trim()]);
+                if (existing) {
+                    return res.status(400).json({ error: `A vendor named "${name.trim()}" already exists.` });
+                }
+
                 if (contactEmail) {
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                     if (!emailRegex.test(contactEmail)) {
@@ -453,6 +471,55 @@ class EmbeddedServer {
                 });
             } catch (error) {
                 console.error('❌ Error creating vendor:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // DELETE /api/vendors/:vendorId
+        this.app.delete('/api/vendors/:vendorId', (req, res) => {
+            try {
+                const { vendorId } = req.params;
+                const { password } = req.headers; // Checking password in headers for simplicity
+
+                console.log(`🗑️ Deleting vendor: ${vendorId}`);
+
+                // Safety Password Check
+                if (password !== '1234') {
+                    return res.status(403).json({ error: 'Unauthorized: Invalid safety password.' });
+                }
+
+                // 1. Check for active subscriptions linked to this vendor
+                const activeSubs = this.db.prepare('SELECT COUNT(*) as count FROM subscriptions WHERE vendor_id = ? AND status = "active"').get([vendorId]);
+                if (activeSubs.count > 0) {
+                    return res.status(400).json({ 
+                        error: 'Cannot delete vendor with active subscriptions. Cancel them first.' 
+                    });
+                }
+
+                // 2. We allow deletion if no active subs. 
+                // Using a transaction to ensure clean cleanup
+                const deleteTransaction = this.db.transaction(() => {
+                    // Delete services (foreign key cascade handles this if set, but let's be explicit or safe)
+                    this.db.prepare('DELETE FROM vendor_services WHERE vendor_id = ?').run([vendorId]);
+                    // Delete credit balances
+                    this.db.prepare('DELETE FROM credit_balances WHERE vendor_id = ?').run([vendorId]);
+                    // Finally delete vendor
+                    return this.db.prepare('DELETE FROM vendors WHERE vendor_id = ?').run([vendorId]);
+                });
+
+                const result = deleteTransaction();
+
+                if (result.changes === 0) {
+                    return res.status(404).json({ error: 'Vendor not found' });
+                }
+
+                console.log(`✅ Vendor deleted: ${vendorId}`);
+                res.json({
+                    success: true,
+                    message: 'Vendor and associated services deleted successfully'
+                });
+            } catch (error) {
+                console.error('❌ Error deleting vendor:', error);
                 res.status(500).json({ error: error.message });
             }
         });
@@ -498,7 +565,7 @@ class EmbeddedServer {
         this.app.post('/api/vendor-services', (req, res) => {
             try {
                 console.log('➕ Creating new vendor service...');
-                const { vendorID, serviceName, description } = req.body;
+                const { vendorID, serviceName, description, itemType, defaultPrice, costPrice } = req.body;
 
                 // Validation
                 if (!vendorID || !serviceName) {
@@ -524,11 +591,19 @@ class EmbeddedServer {
                 const serviceId = this.generateId();
 
                 const stmt = this.db.prepare(`
-                    INSERT INTO vendor_services (service_id, vendor_id, service_name, description, created_date)
-                    VALUES (?, ?, ?, ?, datetime('now'))
+                    INSERT INTO vendor_services (service_id, vendor_id, service_name, description, item_type, default_price, cost_price, created_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 `);
 
-                const result = stmt.run([serviceId, vendorID, serviceName.trim(), description || '']);
+                const result = stmt.run([
+                    serviceId, 
+                    vendorID, 
+                    serviceName.trim(), 
+                    description || '',
+                    itemType || 'subscription',
+                    parseFloat(defaultPrice) || 0,
+                    parseFloat(costPrice) || 0
+                ]);
 
                 if (result.changes === 0) {
                     throw new Error('Failed to create vendor service');
@@ -625,165 +700,90 @@ class EmbeddedServer {
                     const {
                         customerID, serviceName, startDate, creditsSelected,
                         amountPaid, status, vendorID, vendorServiceName,
-                        notes, classification, macAddress
+                        notes, classification, macAddress, itemType, bundleID,
+                        paymentType, paymentStatus, transactionIdRef, orderStatus
                     } = subscriptionData;
 
-                    // Comprehensive validation
-                    const validationErrors = [];
-
-                    if (!customerID || customerID.trim() === '') {
-                        validationErrors.push('Customer ID is required');
+                    // 1. Basic Validation
+                    if (!customerID || !startDate) {
+                        throw new Error('Customer ID and Start Date are required');
                     }
 
-                    if (!startDate) {
-                        validationErrors.push('Start date is required');
-                    } else {
-                        const startDateObj = new Date(startDate);
-                        if (isNaN(startDateObj.getTime())) {
-                            validationErrors.push('Invalid start date format');
-                        }
-                    }
-
-                    if (!creditsSelected) {
-                        validationErrors.push('Credits selection is required');
-                    } else {
-                        const credits = parseInt(creditsSelected);
-                        if (isNaN(credits) || credits <= 0) {
-                            validationErrors.push('Credits must be a positive number');
-                        } else if (credits > 60) {
-                            validationErrors.push('Credits cannot exceed 60 months');
-                        }
-                    }
-
-                    if (!amountPaid) {
-                        validationErrors.push('Payment amount is required');
-                    } else {
-                        const amount = parseFloat(amountPaid);
-                        if (isNaN(amount) || amount <= 0) {
-                            validationErrors.push('Payment amount must be greater than $0');
-                        } else if (amount > 50000) {
-                            validationErrors.push('Payment amount seems unusually high (max $50,000)');
-                        }
-                    }
-
-                    // MAC address validation (optional but must be valid format if provided)
-                    if (macAddress && macAddress.trim() !== '') {
-                        const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^[0-9A-Fa-f]{12}$/;
-                        if (!macRegex.test(macAddress.trim())) {
-                            validationErrors.push('MAC address must be in format XX:XX:XX:XX:XX:XX, XX-XX-XX-XX-XX-XX, or XXXXXXXXXXXX');
-                        }
-                    }
-
-                    if (validationErrors.length > 0) {
-                        throw new Error(validationErrors.join('; '));
-                    }
-
-                    // Verify customer exists and is active
-                    const customer = this.db.prepare('SELECT * FROM customers WHERE id = ? AND (status = "active" OR status IS NULL)').get([customerID]);
-                    if (!customer) {
-                        throw new Error('Customer not found or inactive');
-                    }
-
-                    console.log(`✅ Customer verified: ${customer.name}`);
-
-                    // If vendor service is specified, check credit availability
-                    if (vendorID && vendorServiceName) {
-                        console.log(`🔍 Checking credit availability for vendor: ${vendorID}, service: ${vendorServiceName}`);
-
-                        const creditBalance = this.db.prepare(`
-                            SELECT * FROM credit_balances 
-                            WHERE vendor_id = ? AND service_name = ?
-                        `).get([vendorID, vendorServiceName]);
-
-                        if (!creditBalance) {
-                            // Check if vendor and service exist
-                            const vendor = this.db.prepare('SELECT name FROM vendors WHERE vendor_id = ?').get([vendorID]);
-                            const service = this.db.prepare('SELECT * FROM vendor_services WHERE vendor_id = ? AND service_name = ?').get([vendorID, vendorServiceName]);
-
-                            if (!vendor) {
-                                throw new Error('Vendor not found');
-                            }
-                            if (!service) {
-                                throw new Error(`Service "${vendorServiceName}" not found for vendor`);
-                            }
-
-                            throw new Error(`No credit balance found for service: ${vendorServiceName}. Please purchase credits first.`);
-                        }
-
-                        if (creditBalance.remaining_credits < parseInt(creditsSelected)) {
-                            throw new Error(`Insufficient credits. Available: ${creditBalance.remaining_credits}, Required: ${creditsSelected}`);
-                        }
-
-                        console.log(`✅ Credit check passed. Available: ${creditBalance.remaining_credits}, Using: ${creditsSelected}`);
-                    }
-
-                    // Check for duplicate MAC address if provided
-                    if (macAddress && macAddress.trim() !== '') {
-                        const normalizedMac = macAddress.replace(/[:-]/g, '').toUpperCase();
-                        const existingMac = this.db.prepare(`
-                            SELECT s.id, c.name as customer_name 
-                            FROM subscriptions s
-                            JOIN customers c ON s.customer_id = c.id
-                            WHERE REPLACE(REPLACE(UPPER(s.mac_address), ':', ''), '-', '') = ? 
-                            AND s.status = 'active'
-                        `).get([normalizedMac]);
-
-                        if (existingMac) {
-                            throw new Error(`MAC address already in use by ${existingMac.customer_name} (Subscription ID: ${existingMac.id})`);
-                        }
-                    }
-
-                    // Calculate expiration date
-                    const startDateObj = new Date(startDate);
-                    const expirationDateObj = new Date(startDateObj);
-                    expirationDateObj.setMonth(expirationDateObj.getMonth() + parseInt(creditsSelected));
-                    expirationDateObj.setDate(expirationDateObj.getDate() - 1);
-
+                    // 2. Generate ID and Calculate Dates
                     const subscriptionId = this.generateId();
+                    const startDateObj = new Date(startDate);
+                    let expirationDateStr = '';
+                    
+                    const credits = parseInt(creditsSelected || 0);
+                    if (itemType === 'subscription') {
+                        const expirationDateObj = new Date(startDateObj);
+                        expirationDateObj.setMonth(expirationDateObj.getMonth() + credits);
+                        expirationDateObj.setDate(expirationDateObj.getDate() - 1);
+                        expirationDateStr = expirationDateObj.toISOString().split('T')[0];
+                    } else {
+                        // Hardware/Fees/Products don't expire. 
+                        // Set to a far future date to satisfy any "expiration > start" constraints
+                        expirationDateStr = '9999-12-31';
+                    }
 
-                    // Normalize MAC address format
+                    // 3. Normalize MAC Address
                     let normalizedMacAddress = '';
                     if (macAddress && macAddress.trim() !== '') {
                         const cleaned = macAddress.replace(/[:-]/g, '').toUpperCase();
                         normalizedMacAddress = cleaned.match(/.{2}/g)?.join(':') || macAddress;
                     }
 
-                    // Insert subscription with MAC address
+                    // 4. Credit/Stock Check
+                    if (itemType !== 'fee' && vendorID && vendorServiceName && credits > 0) {
+                        const creditBalance = this.db.prepare(`
+                            SELECT remaining_credits FROM credit_balances 
+                            WHERE vendor_id = ? AND service_name = ?
+                        `).get([vendorID, vendorServiceName]);
+
+                        if (!creditBalance || creditBalance.remaining_credits < credits) {
+                            throw new Error(`Insufficient stock for ${vendorServiceName}. Available: ${creditBalance ? creditBalance.remaining_credits : 0}`);
+                        }
+                    }
+
+                    // 5. Insert Record
                     const stmt = this.db.prepare(`
                         INSERT INTO subscriptions (
                             id, customer_id, service_name, start_date, expiration_date, 
                             amount_paid, status, vendor_id, vendor_service_name, 
-                            credits_used, notes, classification, mac_address, created_date
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                            credits_used, notes, classification, mac_address, 
+                            item_type, bundle_id, payment_type, payment_status, 
+                            transaction_id_ref, order_status, created_date
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                     `);
 
                     const insertResult = stmt.run([
                         subscriptionId,
                         customerID,
-                        serviceName || 'IT App Services',
+                        serviceName || 'IT Service',
                         startDate,
-                        expirationDateObj.toISOString().split('T')[0],
-                        parseFloat(amountPaid),
+                        expirationDateStr,
+                        parseFloat(amountPaid || 0),
                         status || 'active',
                         vendorID || '',
                         vendorServiceName || '',
-                        parseInt(creditsSelected),
+                        credits,
                         notes || '',
                         classification || '',
-                        normalizedMacAddress
+                        normalizedMacAddress,
+                        itemType || 'subscription',
+                        bundleID || null,
+                        paymentType || 'Cash',
+                        paymentStatus || 'Paid',
+                        transactionIdRef || null,
+                        orderStatus || 'Closed'
                     ]);
 
                     if (insertResult.changes === 0) {
-                        throw new Error('Failed to create subscription - no rows affected');
+                        throw new Error('Failed to create subscription record');
                     }
 
-                    console.log(`✅ Subscription created with ID: ${subscriptionId}${normalizedMacAddress ? ' for MAC: ' + normalizedMacAddress : ''}`);
-
-                    // If vendor service is specified, update credit balances and create usage record
-                    if (vendorID && vendorServiceName) {
-                        console.log('🔄 Updating credit balances...');
-
-                        // Update credit balance
+                    // 6. Update Inventory/Stock
+                    if (vendorID && vendorServiceName && credits > 0) {
                         const updateStmt = this.db.prepare(`
                             UPDATE credit_balances 
                             SET remaining_credits = remaining_credits - ?, 
@@ -791,34 +791,7 @@ class EmbeddedServer {
                                 last_updated = datetime('now')
                             WHERE vendor_id = ? AND service_name = ?
                         `);
-
-                        const updateResult = updateStmt.run([
-                            parseInt(creditsSelected),
-                            parseInt(creditsSelected),
-                            vendorID,
-                            vendorServiceName
-                        ]);
-
-                        if (updateResult.changes === 0) {
-                            throw new Error('Failed to update credit balance - no rows affected');
-                        }
-
-                        console.log(`✅ Credit balance updated. Deducted ${creditsSelected} credits`);
-
-                        // Create credit usage record
-                        const usageId = this.generateId();
-                        const usageStmt = this.db.prepare(`
-                            INSERT INTO credit_usage (usage_id, vendor_id, service_name, subscription_id, credits_used, usage_date)
-                            VALUES (?, ?, ?, ?, ?, datetime('now'))
-                        `);
-
-                        const usageResult = usageStmt.run([usageId, vendorID, vendorServiceName, subscriptionId, parseInt(creditsSelected)]);
-
-                        if (usageResult.changes === 0) {
-                            throw new Error('Failed to create credit usage record');
-                        }
-
-                        console.log(`✅ Credit usage recorded with ID: ${usageId}`);
+                        updateStmt.run([credits, credits, vendorID, vendorServiceName]);
                     }
 
                     return { subscriptionId };
@@ -829,31 +802,17 @@ class EmbeddedServer {
             });
 
             try {
-                console.log('🚀 Starting subscription transaction...');
                 const result = transaction(req.body);
+                const newSubscription = this.db.prepare('SELECT * FROM subscriptions WHERE id = ?').get([result.subscriptionId]);
 
-                const newSubscription = this.db.prepare(`
-                    SELECT s.*, c.name as customer_name, c.email as customer_email
-                    FROM subscriptions s
-                    JOIN customers c ON s.customer_id = c.id
-                    WHERE s.id = ?
-                `).get([result.subscriptionId]);
-
-                console.log('✅ Subscription added successfully');
                 res.status(201).json({
                     success: true,
-                    message: req.body.vendorID && req.body.vendorServiceName ?
-                        'Subscription added successfully and credits deducted' :
-                        'Subscription added successfully',
+                    message: 'Sale processed successfully',
                     subscription: newSubscription
                 });
             } catch (error) {
                 console.error('❌ Error creating subscription:', error);
-                res.status(500).json({
-                    error: error.message || 'Failed to create subscription',
-                    details: 'Check server logs for more information',
-                    timestamp: new Date().toISOString()
-                });
+                res.status(500).json({ error: error.message });
             }
         });
 
@@ -888,12 +847,53 @@ class EmbeddedServer {
             }
         });
 
+        // PUT /api/subscriptions/:id/order-status
+        this.app.put('/api/subscriptions/:id/order-status', (req, res) => {
+            try {
+                const { id } = req.params;
+                const { orderStatus } = req.body;
+                this.db.prepare('UPDATE subscriptions SET order_status = ? WHERE id = ?').run([orderStatus, id]);
+                res.json({ success: true, message: 'Order status updated' });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // PUT /api/subscriptions/:id/metadata
+        this.app.put('/api/subscriptions/:id/metadata', (req, res) => {
+            try {
+                const { id } = req.params;
+                const { orderStatus, paymentType, paymentStatus, transactionIdRef, notes } = req.body;
+                this.db.prepare(`
+                    UPDATE subscriptions 
+                    SET order_status = ?, payment_type = ?, payment_status = ?, 
+                        transaction_id_ref = ?, notes = ?
+                    WHERE id = ?
+                `).run([orderStatus, paymentType, paymentStatus, transactionIdRef, notes, id]);
+                res.json({ success: true, message: 'Metadata updated' });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // PUT /api/subscriptions/bundle/:bundleId/status
+        this.app.put('/api/subscriptions/bundle/:bundleId/status', (req, res) => {
+            try {
+                const { bundleId } = req.params;
+                const { orderStatus } = req.body;
+                this.db.prepare('UPDATE subscriptions SET order_status = ? WHERE bundle_id = ?').run([orderStatus, bundleId]);
+                res.json({ success: true, message: 'Combo order status updated' });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         // GET /api/subscriptions/weekly-expiring
         this.app.get('/api/subscriptions/weekly-expiring', (req, res) => {
             try {
                 console.log('📅 Fetching weekly expiring subscriptions...');
                 const expiring = this.db.prepare(`
-                    SELECT s.*, c.name as customer_name, c.email as customer_email
+                    SELECT s.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
                     FROM subscriptions s
                     JOIN customers c ON s.customer_id = c.id
                     WHERE s.status = 'active' 
@@ -915,7 +915,7 @@ class EmbeddedServer {
             try {
                 console.log('📅 Fetching monthly expiring subscriptions...');
                 const expiring = this.db.prepare(`
-                    SELECT s.*, c.name as customer_name, c.email as customer_email
+                    SELECT s.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
                     FROM subscriptions s
                     JOIN customers c ON s.customer_id = c.id
                     WHERE s.status = 'active' 
@@ -957,6 +957,113 @@ class EmbeddedServer {
                 res.json(subscription);
             } catch (error) {
                 console.error('❌ Error searching subscription by MAC:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // DELETE /api/subscriptions/:id
+        this.app.delete('/api/subscriptions/:id', (req, res) => {
+            try {
+                const { id } = req.params;
+                const { password } = req.headers;
+
+                if (password !== '1234') {
+                    return res.status(403).json({ error: 'Unauthorized: Invalid safety password.' });
+                }
+
+                const transaction = this.db.transaction(() => {
+                    // 1. Get the subscription details to restore stock
+                    const sub = this.db.prepare('SELECT * FROM subscriptions WHERE id = ?').get([id]);
+                    if (!sub) throw new Error('Transaction not found');
+
+                    // 2. Restore Stock if vendor data exists
+                    if (sub.vendor_id && sub.vendor_service_name && sub.credits_used > 0) {
+                        this.db.prepare(`
+                            UPDATE credit_balances 
+                            SET remaining_credits = remaining_credits + ?, 
+                                total_used = total_used - ?,
+                                last_updated = datetime('now')
+                            WHERE vendor_id = ? AND service_name = ?
+                        `).run([sub.credits_used, sub.credits_used, sub.vendor_id, sub.vendor_service_name]);
+                    }
+
+                    // 3. Delete the record
+                    return this.db.prepare('DELETE FROM subscriptions WHERE id = ?').run([id]);
+                });
+
+                const result = transaction();
+                res.json({ success: true, message: 'Customer transaction deleted and stock restored.' });
+            } catch (error) {
+                console.error('❌ Error deleting subscription:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // DELETE /api/subscriptions/bundle/:bundleId
+        this.app.delete('/api/subscriptions/bundle/:bundleId', (req, res) => {
+            try {
+                const { bundleId } = req.params;
+                const { password } = req.headers;
+
+                if (password !== '1234') {
+                    return res.status(403).json({ error: 'Unauthorized: Invalid safety password.' });
+                }
+
+                const transaction = this.db.transaction(() => {
+                    // 1. Get all items in the bundle to restore stock
+                    const items = this.db.prepare('SELECT * FROM subscriptions WHERE bundle_id = ?').all([bundleId]);
+                    
+                    for (const item of items) {
+                        if (item.vendor_id && item.vendor_service_name && item.credits_used > 0) {
+                            this.db.prepare(`
+                                UPDATE credit_balances 
+                                SET remaining_credits = remaining_credits + ?, 
+                                    total_used = total_used - ?,
+                                    last_updated = datetime('now')
+                                WHERE vendor_id = ? AND service_name = ?
+                            `).run([item.credits_used, item.credits_used, item.vendor_id, item.vendor_service_name]);
+                        }
+                    }
+
+                    // 2. Delete all records in the bundle
+                    return this.db.prepare('DELETE FROM subscriptions WHERE bundle_id = ?').run([bundleId]);
+                });
+
+                transaction();
+                res.json({ success: true, message: 'Entire combo bundle deleted and stock restored.' });
+            } catch (error) {
+                console.error('❌ Error deleting bundle:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // GET /api/bundles/:bundleId - Get all items in a bundle
+        this.app.get('/api/bundles/:bundleId', (req, res) => {
+            try {
+                const { bundleId } = req.params;
+                const items = this.db.prepare('SELECT * FROM subscriptions WHERE bundle_id = ?').all([bundleId]);
+                if (items.length === 0) return res.status(404).json({ error: 'Bundle not found' });
+                res.json(items);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // PUT /api/bundles/:bundleId - Update all items in a bundle (status, payment, etc)
+        this.app.put('/api/bundles/:bundleId', (req, res) => {
+            try {
+                const { bundleId } = req.params;
+                const { orderStatus, paymentType, paymentStatus, transactionIdRef, notes } = req.body;
+                
+                this.db.prepare(`
+                    UPDATE subscriptions 
+                    SET order_status = ?, payment_type = ?, payment_status = ?, 
+                        transaction_id_ref = ?, notes = ?
+                    WHERE bundle_id = ?
+                `).run([orderStatus, paymentType, paymentStatus, transactionIdRef, notes, bundleId]);
+                
+                res.json({ success: true, message: 'Bundle updated successfully' });
+            } catch (error) {
                 res.status(500).json({ error: error.message });
             }
         });
@@ -1074,48 +1181,70 @@ class EmbeddedServer {
             try {
                 console.log('📊 Generating dashboard statistics...');
 
-                // Get customer count
+                // 1. Get today's stats
+                const today = new Date().toISOString().split('T')[0];
+                const todayStats = this.db.prepare(`
+                    SELECT 
+                        COALESCE(SUM(amount_paid), 0) as cash,
+                        COUNT(*) as count
+                    FROM subscriptions 
+                    WHERE date(start_date) = date(?)
+                `).get([today]);
+
+                // 2. Get customer count
                 const customerCount = this.db.prepare('SELECT COUNT(*) as count FROM customers WHERE (status = "active" OR status IS NULL)').get();
                 const totalCustomers = customerCount.count || 0;
 
-                // Get subscription stats
-                const subscriptions = this.db.prepare('SELECT * FROM subscriptions WHERE status = "active"').all();
+                // 3. Get subscription stats
+                const subscriptions = this.db.prepare("SELECT * FROM subscriptions WHERE status = 'active'").all();
                 const totalCreditsUsed = subscriptions.reduce((sum, sub) => sum + (sub.credits_used || 0), 0);
                 const totalRevenue = subscriptions.reduce((sum, sub) => sum + (sub.amount_paid || 0), 0);
 
-                // Get vendor transaction costs
+                // Revenue Breakdown
+                const revenueBreakdown = {
+                    credits: subscriptions.filter(s => (s.item_type || 'subscription') === 'subscription')
+                                         .reduce((sum, s) => sum + (s.amount_paid || 0), 0),
+                    hardware: subscriptions.filter(s => s.item_type === 'hardware')
+                                          .reduce((sum, s) => sum + (s.amount_paid || 0), 0),
+                    fees: subscriptions.filter(s => s.item_type === 'fee')
+                                      .reduce((sum, s) => sum + (s.amount_paid || 0), 0)
+                };
+
+                // 4. Get vendor transaction costs
                 const vendorTransactions = this.db.prepare('SELECT * FROM vendor_transactions').all();
                 const totalVendorCosts = vendorTransactions.reduce((sum, trans) => sum + (trans.price_usd || 0), 0);
 
-                // Calculate average cost per credit
+                // 5. Calculate average cost per credit
                 const totalCreditsFromVendors = vendorTransactions.reduce((sum, trans) => sum + (trans.credits || 0), 0);
                 const avgCostPerCredit = totalCreditsFromVendors > 0 ? totalVendorCosts / totalCreditsFromVendors : 0;
-                const avgRevenuePerCredit = totalCreditsUsed > 0 ? totalRevenue / totalCreditsUsed : 0;
+                
+                // 6. Calculate today's estimated net profit
+                // (Cash collected today - (Credits sold today * average cost))
+                const todayCreditsSold = this.db.prepare(`
+                    SELECT COALESCE(SUM(credits_used), 0) as qty FROM subscriptions WHERE date(start_date) = date(?)
+                `).get([today]).qty || 0;
+                const todayProfit = todayStats.cash - (todayCreditsSold * avgCostPerCredit);
 
-                // Calculate profits
+                // 7. Get final stats
                 const netProfitFromCreditSales = totalRevenue - (totalCreditsUsed * avgCostPerCredit);
                 const finalNetProfit = totalRevenue - totalVendorCosts;
 
-                // Get credit balances
                 const creditBalances = this.db.prepare('SELECT * FROM credit_balances').all();
                 const totalCreditsRemaining = creditBalances.reduce((sum, balance) => sum + (balance.remaining_credits || 0), 0);
                 const lowCreditAlerts = creditBalances.filter(balance => (balance.remaining_credits || 0) < 10).length;
 
-                // Additional stats
-                const activeSubscriptions = subscriptions.length;
-                const subscriptionsWithMac = subscriptions.filter(sub => sub.mac_address && sub.mac_address.trim() !== '').length;
-
-                console.log(`✅ Dashboard stats calculated: ${totalCustomers} customers, ${activeSubscriptions} subscriptions, $${totalRevenue} revenue`);
-
                 res.json({
+                    today: {
+                        cash: todayStats.cash,
+                        profit: todayProfit,
+                        salesCount: todayStats.count
+                    },
+                    revenueBreakdown,
                     totalCustomers,
-                    activeSubscriptions,
-                    subscriptionsWithMac,
                     totalCreditsUsed,
                     totalRevenue,
                     totalVendorCosts,
                     avgCostPerCredit: Math.round(avgCostPerCredit * 100) / 100,
-                    avgRevenuePerCredit: Math.round(avgRevenuePerCredit * 100) / 100,
                     netProfitFromCreditSales: Math.round(netProfitFromCreditSales * 100) / 100,
                     finalNetProfit: Math.round(finalNetProfit * 100) / 100,
                     totalCreditsRemaining,
@@ -1124,6 +1253,71 @@ class EmbeddedServer {
                 });
             } catch (error) {
                 console.error('❌ Error fetching dashboard stats:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // GET /api/dashboard/profit-data (for Charts)
+        this.app.get('/api/dashboard/profit-data', (req, res) => {
+            try {
+                const { period } = req.query; // 'monthly' or 'yearly'
+                console.log(`📊 Fetching profit data for chart: ${period}`);
+
+                let labels = [];
+                let revenue = [];
+                let profit = [];
+
+                // Get average cost per unit once for calculations
+                const avgCostRes = this.db.prepare(`
+                    SELECT AVG(CAST(price_usd AS REAL) / CAST(credits AS REAL)) as avg_cost 
+                    FROM vendor_transactions WHERE credits > 0
+                `).get();
+                const avgCostPerUnit = avgCostRes?.avg_cost || 0;
+
+                if (period === 'yearly') {
+                    // Last 5 years
+                    const currentYear = new Date().getFullYear();
+                    for (let i = 4; i >= 0; i--) {
+                        const year = currentYear - i;
+                        const data = this.db.prepare(`
+                            SELECT 
+                                SUM(amount_paid) as revenue,
+                                SUM(credits_used) as qty
+                            FROM subscriptions 
+                            WHERE strftime('%Y', start_date) = ? AND status != 'cancelled'
+                        `).get([year.toString()]);
+
+                        labels.push(year.toString());
+                        revenue.push(data.revenue || 0);
+                        profit.push((data.revenue || 0) - ((data.qty || 0) * avgCostPerUnit));
+                    }
+                } else {
+                    // Last 12 months
+                    for (let i = 11; i >= 0; i--) {
+                        const d = new Date();
+                        d.setMonth(d.getMonth() - i);
+                        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+                        const year = d.getFullYear().toString();
+                        const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+
+                        const data = this.db.prepare(`
+                            SELECT 
+                                SUM(amount_paid) as revenue,
+                                SUM(credits_used) as qty
+                            FROM subscriptions 
+                            WHERE strftime('%m', start_date) = ? AND strftime('%Y', start_date) = ?
+                            AND status != 'cancelled'
+                        `).get([month, year]);
+
+                        labels.push(label);
+                        revenue.push(data.revenue || 0);
+                        profit.push((data.revenue || 0) - ((data.qty || 0) * avgCostPerUnit));
+                    }
+                }
+
+                res.json({ labels, revenue, profit });
+            } catch (error) {
+                console.error('❌ Error fetching profit data:', error);
                 res.status(500).json({ error: error.message });
             }
         });
@@ -1387,6 +1581,42 @@ class EmbeddedServer {
                 });
             } catch (error) {
                 console.error('❌ Error purchasing credits:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // DELETE /api/vendor-transactions/:id
+        this.app.delete('/api/vendor-transactions/:id', (req, res) => {
+            try {
+                const { id } = req.params;
+                const { password } = req.headers;
+
+                if (password !== '1234') {
+                    return res.status(403).json({ error: 'Unauthorized: Invalid safety password.' });
+                }
+
+                const transaction = this.db.transaction(() => {
+                    // 1. Get transaction details to deduct stock
+                    const vt = this.db.prepare('SELECT * FROM vendor_transactions WHERE transaction_id = ?').get([id]);
+                    if (!vt) throw new Error('Vendor transaction not found');
+
+                    // 2. Deduct Stock (Reverse the purchase)
+                    this.db.prepare(`
+                        UPDATE credit_balances 
+                        SET remaining_credits = remaining_credits - ?, 
+                            total_purchased = total_purchased - ?,
+                            last_updated = datetime('now')
+                        WHERE vendor_id = ? AND service_name = ?
+                    `).run([vt.credits, vt.credits, vt.vendor_id, vt.service_name]);
+
+                    // 3. Delete record
+                    return this.db.prepare('DELETE FROM vendor_transactions WHERE transaction_id = ?').run([id]);
+                });
+
+                transaction();
+                res.json({ success: true, message: 'Vendor transaction deleted and stock reduced.' });
+            } catch (error) {
+                console.error('❌ Error deleting vendor transaction:', error);
                 res.status(500).json({ error: error.message });
             }
         });

@@ -1,6 +1,60 @@
-// Transaction history UI management
 class TransactionUI {
+    static allVendorTransactions = [];
+    static allCustomerSales = {};
+    static currentSort = {
+        type: 'vendor', // 'vendor' or 'customer'
+        column: 'date',
+        direction: 'desc'
+    };
+    
+    // Pagination state
+    static pagination = {
+        itemsPerPage: 10,
+        vendorPage: 1,
+        customerPage: 1
+    };
+
+    static initFilters() {
+        const yearSelect = document.getElementById('transFilterYear');
+        if (!yearSelect) return;
+
+        // Only populate if it's currently empty to avoid overwriting user selection
+        if (yearSelect.options.length > 0) return;
+
+        console.log('📅 Initializing Year Filters...');
+        const currentYear = new Date().getFullYear();
+        
+        // Use a temporary array to build options
+        const options = [
+            { value: currentYear, text: `${currentYear} (Current Year)` },
+            { value: 'ytd', text: 'Year to Date' },
+            { value: 'last12', text: 'Last 12 Months' }
+        ];
+
+        // Add past 5 years
+        for (let i = 1; i <= 5; i++) {
+            options.push({ value: currentYear - i, text: (currentYear - i).toString() });
+        }
+
+        // Clear and populate
+        yearSelect.innerHTML = '';
+        options.forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt.value;
+            el.textContent = opt.text;
+            yearSelect.appendChild(el);
+        });
+
+        // Set defaults
+        yearSelect.value = currentYear;
+        const monthSelect = document.getElementById('transFilterMonth');
+        if (monthSelect) {
+            monthSelect.value = new Date().getMonth(); // 0-11
+        }
+    }
+
     static async loadVendorTransactions() {
+        this.initFilters();
         try {
             console.log('🏭 Loading vendor transactions...');
             const container = document.getElementById('vendorTransactionsList');
@@ -9,61 +63,17 @@ class TransactionUI {
             }
             
             const transactions = await CreditsAPI.loadVendorTransactions();
-            this.displayVendorTransactions(transactions);
+            this.allVendorTransactions = Array.isArray(transactions) ? transactions : []; 
+            this.refreshViews(); 
             
-            console.log(`✅ Loaded ${transactions.length} vendor transactions`);
+            console.log(`✅ Loaded ${this.allVendorTransactions.length} vendor transactions`);
         } catch (error) {
             console.error('❌ Error loading vendor transactions:', error);
-            const container = document.getElementById('vendorTransactionsList');
-            if (container) {
-                container.innerHTML = `
-                    <div class="error-message">
-                        <h4>❌ Failed to Load Vendor Transactions</h4>
-                        <p>Error: ${error.message}</p>
-                        <button onclick="TransactionUI.loadVendorTransactions()" class="btn btn-primary">Retry</button>
-                    </div>
-                `;
-            }
-            
-            if (window.Alerts) {
-                Alerts.showError('Loading Error', 'Failed to load vendor transactions');
-            }
         }
-    }
-
-    static displayVendorTransactions(transactions) {
-        const container = document.getElementById('vendorTransactionsList');
-        if (!container) {
-            console.warn('⚠️ Vendor transactions container not found');
-            return;
-        }
-
-        if (transactions.length === 0) {
-            container.innerHTML = `
-                <div class="no-data">
-                    <h4>📋 No Vendor Transactions Found</h4>
-                    <p>No vendor purchase transactions have been recorded yet.</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = transactions.map(trans => `
-            <div class="transaction-item">
-                <div class="transaction-header">
-                    <h4>${trans.vendor_name || trans.VendorName || 'Unknown Vendor'} - ${trans.service_name || trans.ServiceName || 'Unknown Service'}</h4>
-                </div>
-                <div class="transaction-details">
-                    <strong>📅 Date:</strong> ${this.formatDate(trans.purchase_date || trans.PurchaseDate)}<br>
-                    <strong>💰 Cost:</strong> ${this.formatCurrency(trans.price_usd || trans.PriceUSD)} USD<br>
-                    <strong>💳 Credits:</strong> ${this.formatNumber(trans.credits || trans.Credits)}<br>
-                    ${(trans.notes || trans.Notes) ? `<strong>📝 Notes:</strong> <em>${trans.notes || trans.Notes}</em>` : ''}
-                </div>
-            </div>
-        `).join('');
     }
 
     static async loadCustomerSales() {
+        this.initFilters();
         try {
             console.log('📊 Loading customer sales...');
             const container = document.getElementById('customerSalesList');
@@ -72,200 +82,380 @@ class TransactionUI {
             }
             
             const customerSales = await SubscriptionsAPI.loadCustomerSales();
-            this.displayCustomerSales(customerSales);
+            this.allCustomerSales = customerSales || {};
+            this.refreshViews(); 
             
-            const customerCount = Object.keys(customerSales).length;
-            console.log(`✅ Loaded customer sales for ${customerCount} customers`);
+            console.log('✅ Customer sales loaded');
         } catch (error) {
             console.error('❌ Error loading customer sales:', error);
-            const container = document.getElementById('customerSalesList');
-            if (container) {
-                container.innerHTML = `
-                    <div class="error-message">
-                        <h4>❌ Failed to Load Customer Sales</h4>
-                        <p>Error: ${error.message}</p>
-                        <p>Please check the console for more details and try refreshing the application.</p>
-                        <button onclick="TransactionUI.loadCustomerSales()" class="btn btn-primary">Retry</button>
-                    </div>
-                `;
-            }
-            
-            if (window.Alerts) {
-                Alerts.showError('Loading Error', 'Failed to load customer sales. Please check your connection and try again.');
-            }
         }
     }
 
-    static displayCustomerSales(customerSales) {
-        const container = document.getElementById('customerSalesList');
-        if (!container) {
-            console.warn('⚠️ Customer sales container not found');
-            return;
-        }
-
-        if (!customerSales || Object.keys(customerSales).length === 0) {
-            container.innerHTML = `
-                <div class="no-data">
-                    <h4>📋 No Customer Sales Found</h4>
-                    <p>No customer sales transactions have been recorded yet.</p>
-                    <p>Customer sales will appear here once subscriptions are added.</p>
-                </div>
-            `;
-            return;
-        }
-
-        let html = '';
-        let totalCustomers = 0;
-        let totalTransactions = 0;
-        let totalRevenue = 0;
-
-        Object.entries(customerSales).forEach(([customerName, customerData]) => {
-            totalCustomers++;
-            html += `
-                <div class="customer-sales-group">
-                    <h4>👤 ${customerName}</h4>
-            `;
-
-            if (customerData.classifications && Object.keys(customerData.classifications).length > 0) {
+    static flattenCustomerSales(salesData) {
+        if (!salesData) return [];
+        const flatSales = [];
+        Object.entries(salesData).forEach(([customerName, customerData]) => {
+            if (customerData && customerData.classifications) {
                 Object.entries(customerData.classifications).forEach(([classification, subs]) => {
-                    const totalAmount = subs.reduce((sum, sub) => {
-                        const amount = parseFloat(sub.amount_paid || sub.AmountPaid || 0);
-                        totalRevenue += amount;
-                        return sum + amount;
-                    }, 0);
-                    const totalMonths = subs.reduce((sum, sub) => sum + parseInt(sub.credits_used || sub.CreditsUsed || 0), 0);
-                    
-                    // Find the latest date
-                    const dates = subs.map(s => new Date(s.start_date || s.StartDate)).filter(d => !isNaN(d));
-                    const latestDate = dates.length > 0 ? Math.max(...dates) : null;
-                    
-                    totalTransactions += subs.length;
-
-                    html += `
-                        <div class="classification-group">
-                            <div class="classification-header">
-                                <h5>📍 ${classification}</h5>
-                                <div class="classification-summary">
-                                    <strong>Services:</strong> ${subs.length} | 
-                                    <strong>Total Months:</strong> ${totalMonths} | 
-                                    ${latestDate ? `<strong>Latest:</strong> ${this.formatDate(new Date(latestDate))} |` : ''}
-                                    <strong>Total Amount:</strong> ${this.formatCurrency(totalAmount)}
-                                </div>
-                            </div>
-                            <div class="subscription-list">
-                                ${subs.map(sub => `
-                                    <div class="subscription-item">
-                                        <strong>${sub.service_name || 'IT Service'}</strong> - 
-                                        ${this.formatCurrency(sub.amount_paid || sub.AmountPaid || 0)} 
-                                        (${sub.credits_used || sub.CreditsUsed || 0} months)
-                                        <span class="date">${this.formatDate(sub.start_date || sub.StartDate)}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
+                    if (Array.isArray(subs)) {
+                        subs.forEach(sub => {
+                            flatSales.push({
+                                customerName,
+                                classification,
+                                ...sub,
+                                bundle_id: sub.bundle_id || sub.BundleID,
+                                item_type: sub.item_type || sub.ItemType
+                            });
+                        });
+                    }
                 });
-            } else {
-                html += `
-                    <div class="no-classifications">
-                        <p><em>No service classifications found for this customer.</em></p>
-                    </div>
-                `;
+            }
+        });
+        return flatSales;
+    }
+
+    static applyFilters() {
+        this.pagination.vendorPage = 1;
+        this.pagination.customerPage = 1;
+        this.refreshViews();
+    }
+
+    static refreshViews() {
+        try {
+            const query = document.getElementById('transactionSearch')?.value.toLowerCase().trim() || '';
+            const monthFilter = document.getElementById('transFilterMonth')?.value;
+            const yearFilter = document.getElementById('transFilterYear')?.value;
+
+            // 1. Vendor Transactions
+            let filteredVendor = this.filterData(this.allVendorTransactions, query, monthFilter, yearFilter, 'purchase_date');
+            filteredVendor = this.sortData(filteredVendor, 'vendor');
+            this.displayVendorTransactions(filteredVendor);
+
+            // 2. Customer Sales (Grouped)
+            this.sortAndDisplayCustomerSales();
+        } catch (err) {
+            console.error('Refresh Views Error:', err);
+        }
+    }
+
+    static sortAndDisplayCustomerSales() {
+        try {
+            const rawSales = this.flattenCustomerSales(this.allCustomerSales);
+            const groups = {};
+            const standalone = [];
+
+            rawSales.forEach(sale => {
+                const bid = sale.bundle_id || sale.BundleID;
+                if (bid) {
+                    if (!groups[bid]) groups[bid] = [];
+                    groups[bid].push(sale);
+                } else {
+                    standalone.push(sale);
+                }
+            });
+
+            const displayList = standalone.map(s => ({ ...s, isBundle: false }));
+            Object.entries(groups).forEach(([bid, items]) => {
+                const first = items[0];
+                const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.amount_paid || 0), 0);
+                const totalCredits = items.reduce((sum, i) => sum + parseInt(i.credits_used || 0), 0);
+                const itemNames = items.map(i => i.service_name || 'Item').join(' + ');
+
+                displayList.push({
+                    ...first,
+                    isBundle: true,
+                    service_name: `📦 COMBO: ${itemNames}`,
+                    amount_paid: totalAmount,
+                    credits_used: totalCredits,
+                    bundleItems: items
+                });
+            });
+
+            const query = document.getElementById('transactionSearch')?.value.toLowerCase().trim() || '';
+            const monthFilter = document.getElementById('transFilterMonth')?.value;
+            const yearFilter = document.getElementById('transFilterYear')?.value;
+
+            const filtered = displayList.filter(item => {
+                // Search check
+                if (query) {
+                    const searchStr = `${item.customerName} ${item.service_name} ${item.notes || ''}`.toLowerCase();
+                    if (!searchStr.includes(query)) return false;
+                }
+
+                // Date check
+                const itemDate = new Date(item.start_date || item.StartDate);
+                if (isNaN(itemDate)) return true;
+
+                const now = new Date();
+                if (yearFilter === 'ytd') {
+                    return itemDate >= new Date(now.getFullYear(), 0, 1) && itemDate <= now;
+                } else if (yearFilter === 'last12') {
+                    const start = new Date(); start.setFullYear(now.getFullYear() - 1);
+                    return itemDate >= start && itemDate <= now;
+                } else if (yearFilter && yearFilter !== 'all') {
+                    const selectedYear = parseInt(yearFilter);
+                    if (monthFilter !== 'all') {
+                        const selectedMonth = parseInt(monthFilter);
+                        return itemDate.getFullYear() === selectedYear && itemDate.getMonth() === selectedMonth;
+                    }
+                    return itemDate.getFullYear() === selectedYear;
+                }
+                return true;
+            });
+
+            // Sort
+            filtered.sort((a, b) => {
+                const col = this.currentSort.column;
+                let valA, valB;
+                if (col === 'date') {
+                    valA = new Date(a.start_date || a.StartDate).getTime();
+                    valB = new Date(b.start_date || b.StartDate).getTime();
+                } else if (col === 'amount') {
+                    valA = parseFloat(a.amount_paid || 0);
+                    valB = parseFloat(b.amount_paid || 0);
+                } else {
+                    valA = (a.customerName || '').toLowerCase();
+                    valB = (b.customerName || '').toLowerCase();
+                }
+                return this.currentSort.direction === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+            });
+
+            this.displayCustomerSales(filtered);
+        } catch (err) {
+            console.error('Sort Error:', err);
+        }
+    }
+
+    static filterData(data, query, month, year, dateField) {
+        if (!Array.isArray(data)) return [];
+        return data.filter(item => {
+            if (query) {
+                const searchStr = JSON.stringify(item).toLowerCase();
+                if (!searchStr.includes(query)) return false;
             }
 
-            html += '</div>';
-        });
+            const itemDate = new Date(item[dateField] || item.PurchaseDate || item.StartDate);
+            if (isNaN(itemDate)) return true;
 
-        // Add summary statistics
-        const summaryHtml = `
-            <div class="sales-summary">
-                <h4>📊 Customer Sales Summary</h4>
-                <div class="summary-stats">
-                    <span><strong>Total Customers:</strong> ${totalCustomers}</span>
-                    <span><strong>Total Transactions:</strong> ${totalTransactions}</span>
-                    <span><strong>Total Revenue:</strong> ${this.formatCurrency(totalRevenue)}</span>
-                </div>
+            const now = new Date();
+            if (year === 'ytd') {
+                return itemDate >= new Date(now.getFullYear(), 0, 1) && itemDate <= now;
+            } else if (year === 'last12') {
+                const start = new Date(); start.setFullYear(now.getFullYear() - 1);
+                return itemDate >= start && itemDate <= now;
+            } else if (year && year !== 'all') {
+                const selectedYear = parseInt(year);
+                if (month !== 'all') {
+                    const selectedMonth = parseInt(month);
+                    return itemDate.getFullYear() === selectedYear && itemDate.getMonth() === selectedMonth;
+                }
+                return itemDate.getFullYear() === selectedYear;
+            }
+            return true;
+        });
+    }
+
+    static sortData(data, type) {
+        if (!Array.isArray(data)) return [];
+        return data.sort((a, b) => {
+            const col = this.currentSort.column;
+            let valA, valB;
+            
+            if (col === 'date') {
+                valA = new Date(a.purchase_date || a.PurchaseDate || a.start_date || a.StartDate).getTime();
+                valB = new Date(b.purchase_date || b.PurchaseDate || b.start_date || b.StartDate).getTime();
+            } else if (col === 'amount' || col === 'cost') {
+                valA = parseFloat(a.price_usd || a.PriceUSD || a.amount_paid || a.AmountPaid || 0);
+                valB = parseFloat(b.price_usd || b.PriceUSD || b.amount_paid || b.AmountPaid || 0);
+            } else {
+                valA = (a.vendor_name || a.VendorName || a.customerName || '').toLowerCase();
+                valB = (b.vendor_name || b.VendorName || b.customerName || '').toLowerCase();
+            }
+
+            return this.currentSort.direction === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+        });
+    }
+
+    static handleSort(type, column) {
+        if (this.currentSort.type === type && this.currentSort.column === column) {
+            this.currentSort.direction = this.currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.currentSort.type = type;
+            this.currentSort.column = column;
+            this.currentSort.direction = (['date', 'amount', 'cost', 'credits'].includes(column)) ? 'desc' : 'asc';
+        }
+        this.refreshViews();
+    }
+    
+    static changePage(type, delta) {
+        if (type === 'vendor') this.pagination.vendorPage += delta;
+        else this.pagination.customerPage += delta;
+        this.refreshViews();
+    }
+
+    static renderPaginationControls(elementId, currentPage, totalItems, type) {
+        const container = document.getElementById(elementId);
+        if (!container) return;
+        const totalPages = Math.ceil(totalItems / this.pagination.itemsPerPage);
+        if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+        container.innerHTML = `
+            <button class="btn-small btn-secondary" ${currentPage === 1 ? 'disabled' : ''} 
+                onclick="TransactionUI.changePage('${type}', -1)">Previous</button>
+            <span style="font-weight: 600;">Page ${currentPage} of ${totalPages}</span>
+            <button class="btn-small btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} 
+                onclick="TransactionUI.changePage('${type}', 1)">Next</button>
+        `;
+    }
+
+    static displayVendorTransactions(filteredTransactions) {
+        const container = document.getElementById('vendorTransactionsList');
+        if (!container) return;
+        if (filteredTransactions.length === 0) {
+            container.innerHTML = '<div class="no-data">No vendor transactions match criteria.</div>';
+            const pag = document.getElementById('vendorPagination'); if(pag) pag.innerHTML = '';
+            return;
+        }
+
+        const totalItems = filteredTransactions.length;
+        const page = this.pagination.vendorPage;
+        const start = (page - 1) * this.pagination.itemsPerPage;
+        const paginatedItems = filteredTransactions.slice(start, start + this.pagination.itemsPerPage);
+
+        const totalCost = filteredTransactions.reduce((sum, t) => sum + parseFloat(t.price_usd || 0), 0);
+        const totalCredits = filteredTransactions.reduce((sum, t) => sum + parseInt(t.credits || 0), 0);
+
+        container.innerHTML = `
+            <div class="table-summary-cards">
+                <div class="summary-card"><span class="summary-label">Transactions</span><span class="summary-value">${totalItems}</span></div>
+                <div class="summary-card"><span class="summary-label">Total Cost</span><span class="summary-value">${this.formatCurrency(totalCost)}</span></div>
+                <div class="summary-card"><span class="summary-label">Credits/Units</span><span class="summary-value">${this.formatNumber(totalCredits)}</span></div>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th onclick="TransactionUI.handleSort('vendor', 'vendor')" style="cursor: pointer;">Vendor ${this.getSortIndicator('vendor', 'vendor')}</th>
+                            <th onclick="TransactionUI.handleSort('vendor', 'service')" style="cursor: pointer;">Service ${this.getSortIndicator('vendor', 'service')}</th>
+                            <th onclick="TransactionUI.handleSort('vendor', 'date')" style="cursor: pointer;">Date ${this.getSortIndicator('vendor', 'date')}</th>
+                            <th class="text-right">Cost (USD)</th>
+                            <th class="text-right">Qty</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${paginatedItems.map(trans => `
+                            <tr>
+                                <td><strong>${trans.vendor_name || 'Vendor'}</strong></td>
+                                <td>${trans.service_name}</td>
+                                <td>${this.formatDate(trans.purchase_date)}</td>
+                                <td class="text-right font-mono">${this.formatCurrency(trans.price_usd)}</td>
+                                <td class="text-right font-mono">${this.formatNumber(trans.credits)}</td>
+                                <td>
+                                    <button onclick="PrintManager.printVendorTransaction('${trans.transaction_id || trans.id}')" class="btn-icon">🖨️</button>
+                                    <button onclick="TransactionUI.deleteTransaction('vendor', '${trans.transaction_id || trans.id}')" class="btn-icon text-danger">🗑️</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
         `;
-
-        container.innerHTML = summaryHtml + html;
+        this.renderPaginationControls('vendorPagination', page, totalItems, 'vendor');
     }
 
-    // Utility methods for formatting
-    static formatDate(date) {
-        if (!date) return 'N/A';
-        
-        try {
-            const dateObj = new Date(date);
-            if (isNaN(dateObj.getTime())) return 'Invalid Date';
-            
-            return dateObj.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            });
-        } catch (error) {
-            console.warn('Error formatting date:', error);
-            return 'Invalid Date';
+    static displayCustomerSales(filteredSales) {
+        const container = document.getElementById('customerSalesList');
+        if (!container) return;
+        if (filteredSales.length === 0) {
+            container.innerHTML = '<div class="no-data">No customer sales match criteria.</div>';
+            const pag = document.getElementById('customerPagination'); if(pag) pag.innerHTML = '';
+            return;
+        }
+
+        const totalItems = filteredSales.length;
+        const page = this.pagination.customerPage;
+        const start = (page - 1) * this.pagination.itemsPerPage;
+        const paginatedItems = filteredSales.slice(start, start + this.pagination.itemsPerPage);
+
+        const totalRev = filteredSales.reduce((sum, s) => sum + parseFloat(s.amount_paid || 0), 0);
+
+        container.innerHTML = `
+            <div class="table-summary-cards">
+                <div class="summary-card"><span class="summary-label">Transactions</span><span class="summary-value">${totalItems}</span></div>
+                <div class="summary-card"><span class="summary-label">Total Revenue</span><span class="summary-value">${this.formatCurrency(totalRev)}</span></div>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th onclick="TransactionUI.handleSort('customer', 'customer')" style="cursor: pointer;">Customer ${this.getSortIndicator('customer', 'customer')}</th>
+                            <th onclick="TransactionUI.handleSort('customer', 'service')" style="cursor: pointer;">Service ${this.getSortIndicator('customer', 'service')}</th>
+                            <th>Payment</th>
+                            <th onclick="TransactionUI.handleSort('customer', 'date')" style="cursor: pointer;">Date ${this.getSortIndicator('customer', 'date')}</th>
+                            <th class="text-right">Amount</th>
+                            <th class="text-center">Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${paginatedItems.map(sale => `
+                            <tr>
+                                <td><strong>${sale.customerName}</strong></td>
+                                <td>${sale.service_name}</td>
+                                <td><small>${sale.payment_type} | ${sale.payment_status}</small></td>
+                                <td>${this.formatDate(sale.start_date)}</td>
+                                <td class="text-right font-mono">${this.formatCurrency(sale.amount_paid)}</td>
+                                <td class="text-center"><span class="status-badge ${sale.order_status === 'Open' ? 'status-expired' : 'status-active'}">${sale.order_status}</span></td>
+                                <td>
+                                    ${sale.order_status === 'Open' ? 
+                                    `<button onclick="TransactionUI.closeOrder('${sale.isBundle ? 'bundle' : 'single'}', '${sale.isBundle ? sale.bundle_id : sale.id}')" 
+                                             class="btn-icon text-success" title="Close Order">✅</button>` : ''}
+                                    <button onclick="${sale.isBundle ? `PrintManager.printCustomerReceipt('${sale.customer_id}')` : `PrintManager.printSingleTransaction('${sale.customer_id}', '${sale.id}')`}" class="btn-icon">🖨️</button>
+                                    <button onclick="TransactionUI.deleteTransaction('${sale.isBundle ? 'customer-bundle' : 'customer'}', '${sale.isBundle ? sale.bundle_id : sale.id}')" class="btn-icon text-danger">🗑️</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        this.renderPaginationControls('customerPagination', page, totalItems, 'customer');
+    }
+
+    static async closeOrder(type, id) {
+        // Instead of directly closing, we send them to POS to fill details
+        if (window.POSUI) {
+            POSUI.loadOrderForUpdate(type, id);
         }
     }
 
-    static formatCurrency(amount) {
-        if (amount === null || amount === undefined) return '$0.00';
-        
+    static async deleteTransaction(type, id) {
+        if (!confirm(`Confirm delete ${type}? Stock will be adjusted.`)) return;
+        const password = prompt('Password (1234):');
+        if (password !== '1234') { Alerts.showError('Error', 'Invalid Password'); return; }
+
         try {
-            const numAmount = parseFloat(amount);
-            if (isNaN(numAmount)) return '$0.00';
-            
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-            }).format(numAmount);
-        } catch (error) {
-            console.warn('Error formatting currency:', error);
-            return '$0.00';
-        }
+            let endpoint = type === 'vendor' ? `/api/vendor-transactions/${id}` : (type === 'customer-bundle' ? `/api/subscriptions/bundle/${id}` : `/api/subscriptions/${id}`);
+            const response = await fetch(endpoint, { method: 'DELETE', headers: { 'password': password } });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error);
+            Alerts.showSuccess('Deleted', result.message);
+            await Promise.all([this.loadVendorTransactions(), this.loadCustomerSales()]);
+            if (window.POSUI) POSUI.loadCatalog();
+            DashboardUI.loadStats();
+        } catch (error) { Alerts.showError('Error', error.message); }
     }
 
-    static formatNumber(number) {
-        if (number === null || number === undefined) return '0';
-        
-        try {
-            const numValue = parseInt(number);
-            if (isNaN(numValue)) return '0';
-            
-            return numValue.toLocaleString('en-US');
-        } catch (error) {
-            console.warn('Error formatting number:', error);
-            return '0';
-        }
+    static getSortIndicator(type, column) {
+        if (this.currentSort.type !== type || this.currentSort.column !== column) return '<span class="sort-icon">↕</span>';
+        return this.currentSort.direction === 'asc' ? '▲' : '▼';
     }
 
-    // Refresh methods
-    static async refreshVendorTransactions() {
-        console.log('🔄 Refreshing vendor transactions...');
-        await this.loadVendorTransactions();
-    }
-
-    static async refreshCustomerSales() {
-        console.log('🔄 Refreshing customer sales...');
-        await this.loadCustomerSales();
-    }
-
-    static async refreshAll() {
-        console.log('🔄 Refreshing all transaction data...');
-        await Promise.all([
-            this.loadVendorTransactions(),
-            this.loadCustomerSales()
-        ]);
-        console.log('✅ All transaction data refreshed');
-    }
+    static formatDate(d) { return d ? new Date(d).toLocaleDateString() : 'N/A'; }
+    static formatCurrency(a) { return '$' + parseFloat(a || 0).toFixed(2); }
+    static formatNumber(n) { return parseInt(n || 0).toLocaleString(); }
+    static formatStatus(s) { return s || 'N/A'; }
 }
 
-// Make available globally
 window.TransactionUI = TransactionUI;
-
-// Export for modules if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TransactionUI;
-}

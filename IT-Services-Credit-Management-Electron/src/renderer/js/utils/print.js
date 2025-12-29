@@ -50,9 +50,19 @@ class PrintManager {
             // Add print-specific styles
             this.addPrintStyles();
 
-            // Use window.print() directly - Electron handles this natively
-            console.log('🖨️ Opening print dialog...');
-            window.print();
+            // Use Electron's native print via IPC instead of window.print()
+            // This allows us to control headers/footers
+            console.log('🖨️ Opening print dialog via Electron API...');
+            
+            if (window.electronAPI && window.electronAPI.printPage) {
+                await window.electronAPI.printPage({
+                    printBackground: true,
+                    silent: false
+                });
+            } else {
+                // Fallback to window.print() if API not available
+                window.print();
+            }
 
             // Clean up after print dialog
             setTimeout(() => {
@@ -271,6 +281,149 @@ class PrintManager {
         }
     }
 
+    // NEW: Print single transaction receipt
+    static async printSingleTransaction(customerId, subscriptionId) {
+        try {
+            console.log(`🖨️ Printing single transaction: ${subscriptionId} for customer ${customerId}`);
+
+            // Load customer transaction data
+            const data = await CustomersAPI.loadTransactions(customerId);
+
+            // Find specific subscription
+            const subscription = data.subscriptions.find(sub => sub.id === subscriptionId);
+
+            if (!subscription) {
+                Alerts.showError('Error', 'Transaction not found');
+                return;
+            }
+
+            // Create data structure for single transaction
+            const singleData = {
+                customer: data.customer,
+                subscription: subscription,
+                summary: {
+                    totalPaid: parseFloat(subscription.amount_paid || subscription.AmountPaid || 0),
+                    totalMonths: parseInt(subscription.credits_used || subscription.CreditsUsed || 0),
+                    totalTransactions: 1
+                }
+            };
+
+            // Create a temporary container
+            const tempContainer = document.createElement('div');
+            tempContainer.id = 'temp-single-receipt-container';
+            tempContainer.style.display = 'none';
+            document.body.appendChild(tempContainer);
+
+            // Render the receipt
+            ReceiptUI.renderSingleTransactionReceipt(singleData, tempContainer);
+
+            // Print the receipt
+            const serviceName = subscription.service_name || subscription.ServiceName || 'Service';
+            const receiptTitle = `Receipt - ${serviceName} - ${data.customer.name || data.customer.Name}`;
+            await this.printContent('temp-single-receipt-container', receiptTitle);
+
+            // Clean up
+            setTimeout(() => {
+                if (document.body.contains(tempContainer)) {
+                    document.body.removeChild(tempContainer);
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('❌ Error printing single transaction:', error);
+            Alerts.showError('Print Error', 'Failed to print transaction receipt');
+        }
+    }
+
+    // NEW: Print vendor transaction receipt
+    static async printVendorTransaction(transactionId) {
+        try {
+            console.log(`🖨️ Printing vendor transaction: ${transactionId}`);
+
+            // Find transaction in loaded data (or fetch if needed, but usually loaded)
+            let transaction = TransactionUI.allVendorTransactions.find(t => 
+                (t.transaction_id || t.id || t.ID) == transactionId
+            );
+            
+            if (!transaction) {
+                // Try fetching if not found locally
+                const allTrans = await CreditsAPI.loadVendorTransactions();
+                transaction = allTrans.find(t => 
+                    (t.transaction_id || t.id || t.ID) == transactionId
+                );
+            }
+
+            if (!transaction) {
+                Alerts.showError('Error', 'Vendor transaction not found');
+                return;
+            }
+
+            // Create a temporary container
+            const tempContainer = document.createElement('div');
+            tempContainer.id = 'temp-vendor-receipt-container';
+            tempContainer.style.display = 'none';
+            document.body.appendChild(tempContainer);
+
+            // Build HTML for vendor receipt
+            const html = `
+                <div class="customer-receipt">
+                    <div class="receipt-header">
+                        <h3>🏭 Vendor Purchase Record</h3>
+                        <div class="receipt-info">
+                            <p><strong>Vendor:</strong> ${transaction.vendor_name || transaction.VendorName}</p>
+                            <p><strong>Date:</strong> ${TransactionUI.formatDate(transaction.purchase_date || transaction.PurchaseDate)}</p>
+                            <p><strong>Transaction ID:</strong> ${transaction.transaction_id || transaction.id || transaction.ID}</p>
+                        </div>
+                    </div>
+
+                    <div class="receipt-summary">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>Service:</span>
+                            <strong>${transaction.service_name || transaction.ServiceName}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>Credits Purchased:</span>
+                            <strong>${TransactionUI.formatNumber(transaction.credits || transaction.Credits)}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-top: 1px solid #ccc; padding-top: 10px;">
+                            <span>Total Cost (USD):</span>
+                            <strong style="font-size: 1.2em;">${TransactionUI.formatCurrency(transaction.price_usd || transaction.PriceUSD)}</strong>
+                        </div>
+                        ${(transaction.notes || transaction.Notes) ? `
+                            <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                                <strong>Notes:</strong><br>
+                                ${transaction.notes || transaction.Notes}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="receipt-footer">
+                        <p>Internal Record - Not for Resale</p>
+                        <p>Thank you for your business!</p>
+                    </div>
+                </div>
+            `;
+            
+            tempContainer.innerHTML = html;
+
+            // Print the receipt
+            const vendorName = transaction.vendor_name || transaction.VendorName || 'Vendor';
+            const receiptTitle = `Purchase Record - ${vendorName} - ${TransactionUI.formatDate(transaction.purchase_date || transaction.PurchaseDate)}`;
+            await this.printContent('temp-vendor-receipt-container', receiptTitle);
+
+            // Clean up
+            setTimeout(() => {
+                if (document.body.contains(tempContainer)) {
+                    document.body.removeChild(tempContainer);
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('❌ Error printing vendor transaction:', error);
+            Alerts.showError('Print Error', 'Failed to print vendor transaction record');
+        }
+    }
+
     static preparePrintContentForElectron(element, title) {
         const content = element.cloneNode(true);
 
@@ -320,7 +473,7 @@ class PrintManager {
         styleSheet.textContent = `
             @media print {
                 @page {
-                    margin: 0.75in;
+                    margin: 0.2in;
                     size: letter;
                 }
                 
@@ -335,6 +488,7 @@ class PrintManager {
                 .electron-print-wrapper {
                     width: 100% !important;
                     background: white !important;
+                    padding: 0.2in !important;
                 }
                 
                 .print-header {

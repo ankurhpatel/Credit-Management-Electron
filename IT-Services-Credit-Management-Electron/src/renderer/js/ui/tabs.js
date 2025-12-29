@@ -141,6 +141,7 @@ class Tabs {
         // Method 4: button text mapping
         const buttonText = button.textContent.trim();
         const textToTabMap = {
+            '🛒 New Sale (POS)': 'pos',
             '📊 Dashboard': 'dashboard',
             '📈 P&L Statement': 'pnl',
             '💳 Credit Balances': 'credits',
@@ -243,7 +244,7 @@ class Tabs {
 
             // Validate tab name
             const validTabs = [
-                'dashboard', 'pnl', 'credits', 'customers', 'vendors', 'business', 'transactions'
+                'pos', 'dashboard', 'pnl', 'credits', 'customers', 'vendors', 'business', 'transactions'
             ];
 
             if (!validTabs.includes(tabName)) {
@@ -404,8 +405,17 @@ class Tabs {
                     break;
 
                 case 'transactions':
-                    // Load vendor transactions by default
-                    this.showTransactionTab('vendor-purchases');
+                    if (window.TransactionUI) {
+                        TransactionUI.initFilters();
+                    }
+                    // Load customer sales by default
+                    this.showTransactionTab('customer-sales');
+                    break;
+
+                case 'pos':
+                    if (window.POSUI) {
+                        POSUI.init();
+                    }
                     break;
 
                 default:
@@ -609,7 +619,9 @@ class Tabs {
                     Forms.setDefaultDates();
                     break;
                 case 'vendor-services':
-                    await VendorsUI.loadAndDisplayServices();
+                    if (window.VendorsUI) {
+                        await VendorsUI.loadAndDisplayServices();
+                    }
                     VendorsAPI.populateVendorSelects();
                     break;
                 case 'purchase-credits':

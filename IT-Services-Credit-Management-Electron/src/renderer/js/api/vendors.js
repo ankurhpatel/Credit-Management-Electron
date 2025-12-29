@@ -111,6 +111,32 @@ class VendorsAPI {
         }
     }
 
+    static async delete(vendorId, password) {
+        try {
+            console.log(`🗑️ Deleting vendor: ${vendorId}`);
+            const response = await fetch(`/api/vendors/${vendorId}`, {
+                method: 'DELETE',
+                headers: {
+                    'password': password
+                }
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to delete vendor');
+            }
+
+            console.log('✅ Vendor deleted successfully');
+            await this.loadAll(); // Refresh list
+            return result;
+        } catch (error) {
+            console.error('❌ Error deleting vendor:', error);
+            Alerts.showError('Delete Error', error.message);
+            throw error;
+        }
+    }
+
     static populateVendorSelects() {
         const vendors = Store.getVendors();
         

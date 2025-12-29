@@ -14,16 +14,13 @@ class DatabaseManager {
         try {
             console.log('🔄 Initializing SQL.js database...');
 
-            // Initialize SQL.js
+            // ... (keep existing init code)
             this.SQL = await initSqlJs();
-
-            // Ensure database directory exists
             const dbDir = path.dirname(this.dbPath);
             if (!fs.existsSync(dbDir)) {
                 fs.mkdirSync(dbDir, { recursive: true });
             }
 
-            // Load existing database or create new one
             let dbBuffer;
             if (fs.existsSync(this.dbPath)) {
                 console.log('📖 Loading existing database...');
@@ -33,23 +30,121 @@ class DatabaseManager {
                 dbBuffer = null;
             }
 
-            // Create database instance
             this.db = new this.SQL.Database(dbBuffer);
-            console.log(`✅ Database connected: ${this.dbPath}`);
-
-            // Set pragmas
             this.db.exec('PRAGMA foreign_keys = ON');
 
-            // Ensure tables exist
             await this.ensureTablesExist();
+            await this.ensureSchemaUpdates();
+            
+            // await this.clearAllData(); 
 
-            // Save database to file
             this.saveToFile();
-
             return this.db;
         } catch (error) {
             console.error('❌ Database initialization failed:', error);
             throw error;
+        }
+    }
+
+    async clearAllData() {
+        try {
+            console.log('🧹 Clearing all database records...');
+            const tables = [
+                'credit_usage',
+                'credit_balances',
+                'vendor_transactions',
+                'subscriptions',
+                'vendor_services',
+                'vendors',
+                'customers',
+                'business_transactions'
+            ];
+
+            this.db.exec('PRAGMA foreign_keys = OFF'); // Temporarily disable to allow clearing
+            tables.forEach(table => {
+                this.db.exec(`DELETE FROM ${table}`);
+            });
+            this.db.exec('PRAGMA foreign_keys = ON');
+            
+            console.log('✅ All records cleared. Schema preserved.');
+        } catch (error) {
+            console.error('❌ Error clearing data:', error);
+        }
+    }
+
+    async ensureSchemaUpdates() {
+        try {
+            console.log('🔄 Checking for schema updates...');
+            
+            // Check vendor_services columns
+            const vsColumns = this.prepare('PRAGMA table_info(vendor_services)').all();
+            const hasItemType = vsColumns.some(c => c.name === 'item_type');
+            const hasDefaultPrice = vsColumns.some(c => c.name === 'default_price');
+
+            if (!hasItemType) {
+                console.log('📦 Adding item_type to vendor_services...');
+                this.db.exec("ALTER TABLE vendor_services ADD COLUMN item_type TEXT DEFAULT 'subscription'");
+            }
+
+            if (!hasDefaultPrice) {
+                console.log('💰 Adding default_price to vendor_services...');
+                this.db.exec("ALTER TABLE vendor_services ADD COLUMN default_price REAL DEFAULT 0");
+            }
+
+            const hasCostPrice = vsColumns.some(c => c.name === 'cost_price');
+            if (!hasCostPrice) {
+                console.log('💸 Adding cost_price to vendor_services...');
+                this.db.exec("ALTER TABLE vendor_services ADD COLUMN cost_price REAL DEFAULT 0");
+            }
+
+            // Check subscriptions columns
+            const subColumns = this.prepare('PRAGMA table_info(subscriptions)').all();
+            const hasSubItemType = subColumns.some(c => c.name === 'item_type');
+            const hasBundleId = subColumns.some(c => c.name === 'bundle_id');
+            const hasMacAddress = subColumns.some(c => c.name === 'mac_address');
+
+            if (!hasSubItemType) {
+                console.log('📦 Adding item_type to subscriptions...');
+                this.db.exec("ALTER TABLE subscriptions ADD COLUMN item_type TEXT DEFAULT 'subscription'");
+            }
+
+            if (!hasBundleId) {
+                console.log('🔗 Adding bundle_id to subscriptions...');
+                this.db.exec("ALTER TABLE subscriptions ADD COLUMN bundle_id TEXT");
+            }
+
+            if (!hasMacAddress) {
+                console.log('🖥️ Adding mac_address to subscriptions...');
+                this.db.exec("ALTER TABLE subscriptions ADD COLUMN mac_address TEXT");
+            }
+
+            // Check for payment and order status columns
+            const subCols = this.prepare('PRAGMA table_info(subscriptions)').all();
+            if (!subCols.some(c => c.name === 'payment_type')) {
+                this.db.exec("ALTER TABLE subscriptions ADD COLUMN payment_type TEXT");
+            }
+            if (!subCols.some(c => c.name === 'payment_status')) {
+                this.db.exec("ALTER TABLE subscriptions ADD COLUMN payment_status TEXT DEFAULT 'Paid'");
+            }
+            if (!subCols.some(c => c.name === 'transaction_id_ref')) {
+                this.db.exec("ALTER TABLE subscriptions ADD COLUMN transaction_id_ref TEXT");
+            }
+            if (!subCols.some(c => c.name === 'order_status')) {
+                this.db.exec("ALTER TABLE subscriptions ADD COLUMN order_status TEXT DEFAULT 'Closed'");
+            }
+
+            // Check for internal_notes in customers
+            const custColumns = this.prepare('PRAGMA table_info(customers)').all();
+            const hasInternalNotes = custColumns.some(c => c.name === 'internal_notes');
+            if (!hasInternalNotes) {
+                console.log('📝 Adding internal_notes to customers...');
+                this.db.exec("ALTER TABLE customers ADD COLUMN internal_notes TEXT");
+            }
+            
+            console.log('✅ Schema updates completed');
+        } catch (error) {
+            console.error('❌ Error updating schema:', error);
+            // Don't throw, as the app might still work
         }
     }
 
@@ -85,6 +180,7 @@ class DatabaseManager {
                 email TEXT UNIQUE,
                 phone TEXT,
                 address TEXT,
+                internal_notes TEXT,
                 created_date TEXT DEFAULT (datetime('now')),
                 status TEXT DEFAULT 'active'
             );
@@ -104,6 +200,9 @@ class DatabaseManager {
                 vendor_id TEXT NOT NULL,
                 service_name TEXT NOT NULL,
                 description TEXT,
+                item_type TEXT DEFAULT 'subscription',
+                default_price REAL DEFAULT 0,
+                cost_price REAL DEFAULT 0,
                 is_available INTEGER DEFAULT 1,
                 created_date TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (vendor_id) REFERENCES vendors(vendor_id) ON DELETE CASCADE
@@ -122,6 +221,13 @@ class DatabaseManager {
                 vendor_service_name TEXT,
                 notes TEXT,
                 status TEXT DEFAULT 'active',
+                item_type TEXT DEFAULT 'subscription',
+                bundle_id TEXT,
+                mac_address TEXT,
+                payment_type TEXT DEFAULT 'Cash',
+                payment_status TEXT DEFAULT 'Paid',
+                transaction_id_ref TEXT,
+                order_status TEXT DEFAULT 'Closed',
                 created_date TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (customer_id) REFERENCES customers(id),
                 FOREIGN KEY (vendor_id) REFERENCES vendors(vendor_id)

@@ -12,24 +12,20 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Setup UI components
         Tabs.initialize();
         Forms.initialize();
-        // Add this after the existing initialization code in app.js
 
         // Initialize print functionality and add print buttons to tabs
-        document.addEventListener('DOMContentLoaded', function () {
-            // Initialize print buttons after a delay to ensure all elements are loaded
-            setTimeout(() => {
-                // Add print buttons to main tabs
-                PrintManager.addPrintButtonToContainer('dashboard', 'Dashboard Report');
-                PrintManager.addPrintButtonToContainer('pnl', 'P&L Statement');
-                PrintManager.addPrintButtonToContainer('credits', 'Credit Balances Report');
-                PrintManager.addPrintButtonToContainer('customers', 'Customer Management Report');
-                PrintManager.addPrintButtonToContainer('vendors', 'Vendor Management Report');
-                PrintManager.addPrintButtonToContainer('business', 'Business Management Report');
-                PrintManager.addPrintButtonToContainer('transactions', 'Transaction History Report');
+        setTimeout(() => {
+            // Add print buttons to main tabs
+            PrintManager.addPrintButtonToContainer('dashboard', 'Dashboard Report');
+            PrintManager.addPrintButtonToContainer('pnl', 'P&L Statement');
+            PrintManager.addPrintButtonToContainer('credits', 'Credit Balances Report');
+            PrintManager.addPrintButtonToContainer('customers', 'Customer Management Report');
+            PrintManager.addPrintButtonToContainer('vendors', 'Vendor Management Report');
+            PrintManager.addPrintButtonToContainer('business', 'Business Management Report');
+            PrintManager.addPrintButtonToContainer('transactions', 'Transaction History Report');
 
-                console.log('🖨️ Print buttons added to all tabs');
-            }, 2000);
-        });
+            console.log('🖨️ Print buttons added to all tabs');
+        }, 2000);
 
         // Load initial data
         await loadInitialData();
@@ -57,7 +53,7 @@ async function loadInitialData() {
 
         // Load dashboard data
         await DashboardUI.loadStats();
-
+        
         // Setup year dropdowns
         PLReportsAPI.populateYearDropdowns();
 

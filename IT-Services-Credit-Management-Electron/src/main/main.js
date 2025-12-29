@@ -11,99 +11,74 @@ let server;
 let isQuitting = false;
 
 function createWindow() {
-    // Create the browser window
+    // Create a smaller "Controller" window instead of the full app frame
     mainWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        minWidth: 1200,
-        minHeight: 800,
+        width: 400,
+        height: 300,
+        resizable: false,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             enableRemoteModule: false,
-            webSecurity: true,
-            // ADD: Allow printing functionality
-            printBackground: true,
-            // ADD: Enable preload script for print functionality (optional)
-            // preload: path.join(__dirname, 'preload.js')
+            webSecurity: true
         },
         icon: getIconPath(),
-        title: 'IT Services Credit Management System',
-        show: false, // Don't show until ready
-        titleBarStyle: 'default',
+        title: 'IT Services Server',
+        show: false,
         backgroundColor: '#ffffff'
     });
 
-    // Load the app - wait for server to be ready
-    const loadApp = () => {
-        mainWindow.loadURL('http://localhost:3001')
-            .catch(err => {
-                console.error('Failed to load app:', err);
-                // Retry after 1 second
-                setTimeout(loadApp, 1000);
-            });
-    };
+    // Provide a simple HTML page for the controller window
+    const controllerHtml = `
+        <html>
+            <body style="font-family: sans-serif; text-align: center; padding: 20px; background: #f8fafc;">
+                <h2 style="color: #667eea;">🚀 Server is Running</h2>
+                <p>The application is now open in your <strong>default web browser</strong>.</p>
+                <div style="margin-top: 20px;">
+                    <button onclick="window.openLink()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        Re-open in Browser
+                    </button>
+                </div>
+                <p style="font-size: 12px; color: #718096; margin-top: 20px;">
+                    URL: <a href="http://localhost:3001" target="_blank">http://localhost:3001</a>
+                </p>
+                <p style="font-size: 11px; color: #a0aec0;">Keep this window open to keep the database active.</p>
+                <script>
+                    window.openLink = () => { window.location.href = 'http://localhost:3001'; };
+                </script>
+            </body>
+        </html>
+    `;
+    
+    mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(controllerHtml)}`);
 
-    loadApp();
-
-    // Show window when ready to prevent visual flash
+    // When ready, open the browser and show the small controller
     mainWindow.once('ready-to-show', () => {
+        console.log('🌐 Opening app in default system browser...');
+        shell.openExternal('http://localhost:3001');
+        
         mainWindow.show();
-        console.log('🚀 IT Services Credit Management System Ready!');
-        // Set window title with version
-        mainWindow.setTitle('IT Services Credit Management v2.0.0');
+        mainWindow.setTitle('IT Services - Server Controller');
     });
 
-    // ADD: Setup print functionality
-    setupPrintHandlers();
+    // Handle external links in the controller (like the localhost link)
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        shell.openExternal(url);
+        return { action: 'deny' };
+    });
 
     // Handle window closed
     mainWindow.on('closed', function () {
         mainWindow = null;
     });
 
-    // Handle close attempt
+    // Handle close attempt - actually quit if the controller is closed
     mainWindow.on('close', (event) => {
         if (!isQuitting) {
-            event.preventDefault();
-            const response = dialog.showMessageBoxSync(mainWindow, {
-                type: 'question',
-                buttons: ['Cancel', 'Minimize to Tray', 'Quit'],
-                defaultId: 2,
-                cancelId: 0,
-                message: 'What would you like to do?',
-                detail: 'You can minimize to system tray or completely quit the application.'
-            });
-
-            if (response === 1) {
-                mainWindow.hide();
-                event.preventDefault();
-            } else if (response === 2) {
-                isQuitting = true;
-                app.quit();
-            }
+            isQuitting = true;
+            app.quit();
         }
     });
-
-    // Handle external links
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
-        return { action: 'deny' };
-    });
-
-    // Handle navigation
-    mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-        const parsedUrl = new URL(navigationUrl);
-        if (parsedUrl.origin !== 'http://localhost:3001') {
-            event.preventDefault();
-            shell.openExternal(navigationUrl);
-        }
-    });
-
-    // Development tools
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.webContents.openDevTools();
-    }
 }
 
 // ADD: Print functionality handlers

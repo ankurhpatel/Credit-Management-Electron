@@ -5,37 +5,205 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>💳 IT Services Credit Management</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
-        <header class="app-header">
-            <h1>💳 IT Services Credit Management</h1>
-            <p>Track credits, manage vendors, and monitor profit margins</p>
+        <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 30px;">
+            <div class="header-logo">
+                <h1>💳 IT Services Management</h1>
+                <p>Proactive POS & Inventory System</p>
+            </div>
+
+            <!-- Global Support Search -->
+            <div class="support-search-container" style="position: relative; width: 400px;">
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="globalSupportSearch" placeholder="🔍 Quick Support: Enter MAC, Phone, or Name..." 
+                           style="flex: 1; padding: 10px; border-radius: 8px; border: 2px solid #667eea; outline: none;"
+                           oninput="SupportUI.search()">
+                    <button onclick="SupportUI.clear()" class="btn-clear" style="padding: 5px 15px;">✕</button>
+                </div>
+                <!-- Search Result Dropdown -->
+                <div id="supportSearchResults" class="support-results-dropdown" style="display: none;"></div>
+            </div>
         </header>
 
         <nav class="tab-nav">
+            <button class="tab-btn" onclick="showTab('pos')">🛒 New Sale (POS)</button>
             <button class="tab-btn active" onclick="showTab('dashboard')">📊 Dashboard</button>
             <button class="tab-btn" onclick="showTab('pnl')">📈 P&L Statement</button>
-            <button class="tab-btn" onclick="showTab('credits')">💳 Credit Balances</button>
+            <button class="tab-btn" onclick="showTab('credits')">📦 Inventory & Stock</button>
             <button class="tab-btn" onclick="showTab('customers')">👥 Customer Management</button>
             <button class="tab-btn" onclick="showTab('vendors')">🏭 Vendor Management</button>
             <button class="tab-btn" onclick="showTab('business')">💼 Business Management</button>
             <button class="tab-btn" onclick="showTab('transactions')">📊 Transaction History</button>
         </nav>
 
+        <!-- POS Tab -->
+        <div id="pos" class="tab-content">
+            <div class="pos-layout">
+                <!-- Left Side: Catalog -->
+                <div class="pos-left">
+                    <div class="pos-section-header">
+                        <h3>📦 Service Catalog</h3>
+                        <input type="text" id="posServiceSearch" placeholder="🔍 Filter services..." oninput="POSUI.filterServices()">
+                    </div>
+                    <div id="posServiceCatalog" class="pos-catalog-container">
+                        <!-- Services will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Right Side: Cart/Checkout -->
+                <div class="pos-right">
+                    <div class="pos-panel customer-panel">
+                        <h3>👤 Customer</h3>
+                        <div class="customer-search-wrapper">
+                            <input type="text" id="posCustomerSearch" placeholder="🔍 Search Customer (Name/Email/Phone)" 
+                                   oninput="POSUI.searchCustomers()" onfocus="POSUI.showCustomerDropdown()">
+                            <div id="posCustomerDropdown" class="search-dropdown" style="display: none;"></div>
+                        </div>
+                        <div id="posSelectedCustomer" class="selected-customer-card" style="display: none;">
+                            <div class="selected-customer-info">
+                                <span class="customer-name-display"></span>
+                                <small class="customer-email-display"></small>
+                            </div>
+                            <button onclick="POSUI.clearCustomer()" class="btn-icon">✕</button>
+                        </div>
+                        
+                        <!-- NEW: Customer Intelligence Panel -->
+                        <div id="posCustomerIntelligence" class="customer-intel-panel" style="display: none;">
+                            <div id="posIntelAlerts"></div>
+                            <div class="intel-section">
+                                <label>📝 Profile Notes:</label>
+                                <div id="posIntelNotes" class="intel-notes-box"></div>
+                            </div>
+                            <div class="intel-section">
+                                <label>💰 Last Paid:</label>
+                                <span id="posIntelLastPrice">-</span>
+                            </div>
+                        </div>
+
+                        <button onclick="showTab('customers'); showCustomerTab('add-customer')" class="btn-small btn-secondary" style="margin-top: 5px; width: 100%;">+ New Customer</button>
+                    </div>
+
+                    <div class="pos-panel cart-panel">
+                        <h3>🛒 Shopping Cart</h3>
+                        
+                        <div id="posCartItems" class="cart-items-list">
+                            <!-- Items will be injected here -->
+                            <div class="placeholder-text">Click services on the left to add to cart</div>
+                        </div>
+
+                        <div class="cart-footer">
+                            <div class="cart-controls-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div class="form-group">
+                                    <label>📑 Order Status:</label>
+                                    <select id="posOrderStatus" class="form-select" style="padding: 8px;">
+                                        <option value="Closed">✅ Closed (Fulfilled)</option>
+                                        <option value="Open">📂 Open (Pending)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>💳 Payment Type:</label>
+                                    <select id="posPaymentType" class="form-select" style="padding: 8px;">
+                                        <option value="Cash">💵 Cash</option>
+                                        <option value="Bank Transfer">🏦 Bank Transfer</option>
+                                        <option value="Card">💳 Credit/Debit Card</option>
+                                        <option value="Zelle/Venmo">📱 Zelle / Venmo</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>💰 Payment Status:</label>
+                                    <select id="posPaymentStatus" class="form-select" style="padding: 8px;">
+                                        <option value="Paid">✅ Paid</option>
+                                        <option value="Pending">⏳ Pending / Unpaid</option>
+                                        <option value="Advance">🎁 Advance Payment</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>🔢 Transaction ID (Ref):</label>
+                                    <input type="text" id="posTransactionIdRef" placeholder="External Ref #" style="padding: 8px;">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>📝 Order Notes:</label>
+                                <input type="text" id="posOrderNotes" placeholder="Optional notes for this order">
+                            </div>
+                            
+                            <div class="price-display cart-total-display">
+                                <span>Grand Total:</span>
+                                <span id="posCartTotal">$0.00</span>
+                            </div>
+
+                            <button id="posCheckoutBtn" class="btn-primary checkout-btn" onclick="POSUI.processSale()">
+                                💳 Complete Bundle Sale & Print
+                            </button>
+                            <button class="btn-small btn-secondary" onclick="POSUI.resetForm()" style="width: 100%; margin-top: 10px;">🗑️ Clear Cart</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Dashboard Tab -->
         <div id="dashboard" class="tab-content active">
             <h2>📊 Dashboard & Analytics</h2>
 
+            <!-- NEW: Today's Pulse Section -->
+            <h3>⚡ Today's Pulse</h3>
+            <div class="dashboard-stats today-stats">
+                <div class="stat-card pulse" style="border-left: 4px solid #667eea;">
+                    <div class="stat-number" id="todayCash">$0.00</div>
+                    <div class="stat-label">Cash Collected Today</div>
+                </div>
+                <div class="stat-card pulse" style="border-left: 4px solid #48bb78;">
+                    <div class="stat-number" id="todayProfit">$0.00</div>
+                    <div class="stat-label">Estimated Net Today</div>
+                </div>
+                <div class="stat-card pulse" style="border-left: 4px solid #ed8936;">
+                    <div class="stat-number" id="todaySalesCount">0</div>
+                    <div class="stat-label">Orders Today</div>
+                </div>
+            </div>
+
+            <!-- NEW: Profit Chart Section -->
+            <div class="chart-container-wrapper" style="background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 35px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h3 style="margin: 0;">📈 Profit Trends</h3>
+                    <div class="tab-buttons" style="display: flex; gap: 5px;">
+                        <button class="tab-button active" id="btnMonthlyChart" onclick="DashboardUI.changeChartPeriod('monthly')">Monthly</button>
+                        <button class="tab-button" id="btnYearlyChart" onclick="DashboardUI.changeChartPeriod('yearly')">Yearly</button>
+                    </div>
+                </div>
+                <div style="height: 350px; position: relative;">
+                    <canvas id="profitChart"></canvas>
+                </div>
+            </div>
+
             <!-- Dashboard Stats -->
+            <h3>🏢 Lifetime Overview</h3>
             <div class="dashboard-stats">
+                <div class="stat-card" style="background: #ebf4ff;">
+                    <div class="stat-number" id="revenueCredits">$0.00</div>
+                    <div class="stat-label">Credit Sales Income</div>
+                </div>
+                <div class="stat-card" style="background: #f0fff4;">
+                    <div class="stat-number" id="revenueHardware">$0.00</div>
+                    <div class="stat-label">Hardware Income</div>
+                </div>
+                <div class="stat-card" style="background: #fffaf0;">
+                    <div class="stat-number" id="revenueFees">$0.00</div>
+                    <div class="stat-label">Service/Fee Income</div>
+                </div>
                 <div class="stat-card">
                     <div class="stat-number" id="totalCustomers">-</div>
                     <div class="stat-label">Total Customers</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="totalCreditsUsed">-</div>
-                    <div class="stat-label">Credits Sold</div>
+                    <div class="stat-label">Units/Months Sold</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="netProfitFromCreditSales">$-</div>
@@ -43,15 +211,15 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="avgProfitPerCredit">$-</div>
-                    <div class="stat-label">Profit per Credit</div>
+                    <div class="stat-label">Profit per Unit</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="avgRevenuePerCredit">$-</div>
-                    <div class="stat-label">Revenue per Credit</div>
+                    <div class="stat-label">Revenue per Unit</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="avgCostPerCredit">$-</div>
-                    <div class="stat-label">Cost per Credit</div>
+                    <div class="stat-label">Cost per Unit</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="totalRevenue">$-</div>
@@ -59,7 +227,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="totalVendorCosts">$-</div>
-                    <div class="stat-label">Vendor Costs</div>
+                    <div class="stat-label">Inventory Costs</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="finalNetProfit">$-</div>
@@ -67,11 +235,11 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="totalCreditsRemaining">-</div>
-                    <div class="stat-label">Credits Remaining</div>
+                    <div class="stat-label">In Stock (Total)</div>
                 </div>
                 <div class="stat-card alert" id="lowCreditAlertsCard">
                     <div class="stat-number" id="lowCreditAlerts">-</div>
-                    <div class="stat-label">⚠️ Low Credit Alerts</div>
+                    <div class="stat-label">⚠️ Low Stock Alerts</div>
                 </div>
             </div>
 
@@ -144,7 +312,7 @@
 
         <!-- Credits Tab -->
         <div id="credits" class="tab-content">
-            <h2>💳 Credit Balances by Vendor</h2>
+            <h2>📦 Inventory & Stock Levels</h2>
             <div id="creditBalancesView" class="credit-balances"></div>
         </div>
 
@@ -199,6 +367,11 @@
                     <div class="form-group">
                         <label>🏠 Address:</label>
                         <textarea name="address" rows="3" maxlength="200" placeholder="Customer address (optional)"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>📝 Internal Business Notes (Private):</label>
+                        <textarea name="internal_notes" rows="2" maxlength="500" placeholder="e.g. Needs video call setup, always asks for discount, etc."></textarea>
+                        <small>These notes are only visible to you in the POS and management tabs.</small>
                     </div>
                     <button type="submit" class="btn-primary">Add Customer</button>
                 </form>
@@ -322,6 +495,10 @@
                             <textarea name="address" id="editCustomerAddress" rows="3" maxlength="200"></textarea>
                         </div>
                         <div class="form-group">
+                            <label>📝 Internal Business Notes (Private):</label>
+                            <textarea name="internal_notes" id="editCustomerInternalNotes" rows="2" maxlength="500"></textarea>
+                        </div>
+                        <div class="form-group">
                             <label>📊 Status:</label>
                             <select name="status" id="editCustomerStatus">
                                 <option value="active">✅ Active</option>
@@ -355,7 +532,7 @@
                 <button class="tab-button active" onclick="showVendorTab('vendor-list')">📋 Vendor List</button>
                 <button class="tab-button" onclick="showVendorTab('add-vendor')">➕ Add Vendor</button>
                 <button class="tab-button" onclick="showVendorTab('vendor-services')">🔧 Service Catalog</button>
-                <button class="tab-button" onclick="showVendorTab('purchase-credits')">💸 Purchase Credits</button>
+                <button class="tab-button" onclick="showVendorTab('purchase-credits')">💸 Add Stock / Purchase</button>
             </div>
 
             <!-- Vendor List Sub-tab -->
@@ -414,7 +591,7 @@
                 </div>
 
                 <!-- Add Service Form -->
-                <h4>Add Service to Catalog</h4>
+                <h4>Add Item to Catalog</h4>
                 <form onsubmit="addVendorService(event)" class="form">
                     <div class="form-group">
                         <label>🏭 Select Vendor:</label>
@@ -424,27 +601,47 @@
                         <small>Or <a href="#" onclick="showVendorTab('add-vendor')">add a new vendor first</a></small>
                     </div>
                     <div class="form-group">
-                        <label>🔧 Service Name:</label>
-                        <input type="text" name="serviceName" required maxlength="100" placeholder="e.g., GOLDTV, SMART4K, IPTV Premium">
+                        <label>📦 Item Type:</label>
+                        <select name="itemType" id="catalogItemType" required onchange="VendorsUI.updateCatalogLabels()">
+                            <option value="subscription">📅 IT Service (Time-based)</option>
+                            <option value="hardware">🔌 Hardware (Physical Product)</option>
+                            <option value="fee">💰 Fee / Shipping</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="catalogNameLabel">🔧 Service Name:</label>
+                        <input type="text" name="serviceName" required maxlength="100" placeholder="Enter name">
+                    </div>
+                    <div class="form-row" style="display: flex; gap: 15px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>💸 Cost Price ($):</label>
+                            <input type="number" name="costPrice" step="0.01" min="0" placeholder="0.00">
+                            <small>What you paid for it.</small>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label id="catalogPriceLabel">💰 Sales Price ($):</label>
+                            <input type="number" name="defaultPrice" step="0.01" min="0" placeholder="0.00">
+                            <small id="catalogPriceHelp">Standard selling price.</small>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>📝 Description:</label>
-                        <textarea name="description" rows="2" maxlength="500" placeholder="Brief service description"></textarea>
+                        <textarea name="description" rows="2" maxlength="500" placeholder="Brief description"></textarea>
                     </div>
-                    <button type="submit" class="btn-primary">Add Service to Catalog</button>
+                    <button type="submit" class="btn-primary">Add to Catalog</button>
                 </form>
             </div>
 
             <!-- Purchase Credits Sub-tab -->
             <div id="purchase-credits" class="vendor-tab-content">
-                <h3>💸 Purchase Credits</h3>
+                <h3>💸 Add Inventory Stock</h3>
 
                 <div class="currency-note">
                     <strong>💱 Currency Note:</strong> Convert your purchase amount to USD before entering. This helps maintain consistent profit calculations.
                 </div>
 
                 <!-- Purchase Credits Form -->
-                <h4>Record Credit Purchase</h4>
+                <h4>Record Product/Service Purchase</h4>
                 <form onsubmit="purchaseCredits(event)" class="form">
                     <div class="form-group">
                         <label>🏭 Select Vendor:</label>
@@ -454,20 +651,20 @@
                         <small>Or <a href="#" onclick="showVendorTab('add-vendor')">add a new vendor first</a></small>
                     </div>
                     <div class="form-group">
-                        <label>🔧 Select Service:</label>
-                        <select name="serviceName" id="purchaseServiceSelect" required>
-                            <option value="">Choose a service...</option>
+                        <label>🔧 Select Product/Service:</label>
+                        <select name="serviceName" id="purchaseServiceSelect" required onchange="VendorsUI.updatePurchaseLabels()">
+                            <option value="">Choose an item...</option>
                         </select>
-                        <small>Service must exist in catalog. <a href="#" onclick="showVendorTab('vendor-services')">Add to catalog</a> if needed.</small>
+                        <small>Item must exist in catalog. <a href="#" onclick="showVendorTab('vendor-services')">Add to catalog</a> if needed.</small>
                     </div>
                     <div class="form-group">
                         <label>📅 Purchase Date:</label>
                         <input type="date" name="purchaseDate" required>
                     </div>
                     <div class="form-group">
-                        <label>📊 Number of Credits:</label>
-                        <input type="number" name="credits" min="1" max="10000" required placeholder="e.g., 1000">
-                        <small>Each credit typically = 1 month of service to sell</small>
+                        <label id="purchaseQtyLabel">📊 Qty / Number of Units:</label>
+                        <input type="number" name="credits" min="1" max="10000" required placeholder="e.g., 5">
+                        <small id="purchaseQtyHelp">For hardware, enter number of units. For services, enter number of months.</small>
                     </div>
                     <div class="form-group">
                         <label>💰 Total Cost in USD ($):</label>
@@ -478,11 +675,11 @@
                         <label>📝 Notes:</label>
                         <textarea name="notes" rows="2" maxlength="500" placeholder="Exchange rates, payment method, additional notes..."></textarea>
                     </div>
-                    <button type="submit" class="btn-primary">💸 Record Credit Purchase</button>
+                    <button type="submit" class="btn-primary">💸 Record Purchase & Add Stock</button>
                 </form>
 
                 <!-- Recent Purchases -->
-                <h4>💳 Recent Credit Purchases</h4>
+                <h4>📦 Recent Inventory Purchases</h4>
                 <div id="recentPurchasesList" class="transactions-list"></div>
             </div>
         </div>
@@ -539,19 +736,51 @@
         <div id="transactions" class="tab-content">
             <h2>📊 Transaction History</h2>
 
-            <div class="transaction-tabs">
-                <button class="tab-button active" onclick="showTransactionTab('vendor-purchases')">🏭 Vendor Purchases</button>
-                <button class="tab-button" onclick="showTransactionTab('customer-sales')">👤 Customer Sales</button>
+            <div class="transaction-controls" style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;">
+                <div class="tab-buttons" style="display: flex; gap: 10px;">
+                    <button class="tab-button active" onclick="showTransactionTab('customer-sales')">👤 Customer Sales</button>
+                    <button class="tab-button" onclick="showTransactionTab('vendor-purchases')">🏭 Vendor Purchases</button>
+                </div>
+
+                <div class="filters" style="display: flex; gap: 10px; margin-left: auto; align-items: center;">
+                    <select id="transFilterMonth" onchange="TransactionUI.applyFilters()" class="form-select" style="padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <option value="all">All Months</option>
+                        <option value="0">January</option>
+                        <option value="1">February</option>
+                        <option value="2">March</option>
+                        <option value="3">April</option>
+                        <option value="4">May</option>
+                        <option value="5">June</option>
+                        <option value="6">July</option>
+                        <option value="7">August</option>
+                        <option value="8">September</option>
+                        <option value="9">October</option>
+                        <option value="10">November</option>
+                        <option value="11">December</option>
+                    </select>
+
+                    <select id="transFilterYear" onchange="TransactionUI.applyFilters()" class="form-select" style="padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <!-- Will be populated by JS, including YTD and Last 12 Months -->
+                    </select>
+
+                    <div class="search-bar" style="width: 250px;">
+                        <input type="text" id="transactionSearch" placeholder="🔍 Search..." 
+                               oninput="TransactionUI.applyFilters()">
+                        <button onclick="TransactionUI.clearTransactionSearch()" class="btn-clear" style="padding: 8px 12px;">✕</button>
+                    </div>
+                </div>
             </div>
 
-            <div id="vendor-purchases" class="transaction-tab-content active">
+            <div id="vendor-purchases" class="transaction-tab-content">
                 <h3>Vendor Credit Purchases</h3>
                 <div id="vendorTransactionsList" class="transactions-list"></div>
+                <div id="vendorPagination" class="pagination-controls" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px; align-items: center;"></div>
             </div>
 
-            <div id="customer-sales" class="transaction-tab-content">
+            <div id="customer-sales" class="transaction-tab-content active">
                 <h3>Customer Sales</h3>
                 <div id="customerSalesList" class="transactions-list"></div>
+                <div id="customerPagination" class="pagination-controls" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px; align-items: center;"></div>
             </div>
         </div>
     </div>
@@ -581,6 +810,8 @@
     <script src="js/ui/credits.js"></script>
     <script src="js/ui/business.js"></script>
     <script src="js/ui/customers.js"></script>
+    <script src="js/ui/pos.js"></script>
+    <script src="js/ui/support.js"></script>
     <script src="js/app.js"></script>
 
 </body>

@@ -25,11 +25,13 @@
     "concurrently": "^9.0.1"
   },
   "build": {
-    "appId": "com.itservices.creditmanagement",
-    "productName": "IT Services Credit Management",
+    "appId": "com.itservices.management",
+    "productName": "ITSM",
+    "executableName": "ITSM",
     "directories": {
       "output": "build"
     },
+    "icon": "assets/icon.png",
     "files": [
       "src/**/*",
       "database/**/*",
@@ -37,8 +39,34 @@
       "node_modules/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IT Services Management",
+      "artifactName": "ITServices_Setup.${ext}"
+    },
+    "msi": {
+      "oneClick": false,
+      "shortcutName": "IT Services Management",
+      "artifactName": "ITServices.${ext}"
     }
   },
   "keywords": [ "electron", "desktop", "subscription", "management" ],

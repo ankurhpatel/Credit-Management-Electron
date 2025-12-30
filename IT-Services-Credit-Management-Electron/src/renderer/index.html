@@ -50,7 +50,14 @@
                 <div class="pos-left">
                     <div class="pos-section-header">
                         <h3>📦 Service Catalog</h3>
-                        <input type="text" id="posServiceSearch" placeholder="🔍 Filter services..." oninput="POSUI.filterServices()">
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="text" id="posServiceSearch" placeholder="🔍 Filter by name, type, vendor, or price..."
+                                   oninput="POSUI.filterServices()" style="width: 100%; padding-right: 35px;">
+                            <button onclick="document.getElementById('posServiceSearch').value=''; POSUI.filterServices();"
+                                    id="posClearSearchBtn"
+                                    style="position: absolute; right: 8px; background: none; border: none; color: #a0aec0; cursor: pointer; font-size: 18px; padding: 4px 8px; display: none;"
+                                    title="Clear search">✕</button>
+                        </div>
                     </div>
                     <div id="posServiceCatalog" class="pos-catalog-container">
                         <!-- Services will be injected here -->
@@ -151,6 +158,43 @@
             </div>
         </div>
 
+        <!-- Low Stock Threshold Modal -->
+        <div id="thresholdModal" class="modal-backdrop" style="display: none;">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>⚙️ Configure Low Stock Alert</h3>
+                    <button onclick="CreditsUI.closeThresholdModal()" class="btn-icon">✕</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="thresholdServiceId">
+
+                    <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="font-weight: 600; margin-bottom: 5px;">Service</div>
+                        <div id="thresholdServiceName" style="font-size: 18px; color: #2d3748;"></div>
+                        <div style="margin-top: 8px; font-size: 14px; color: #718096;">
+                            Current Stock: <strong id="thresholdCurrentStock"></strong> units
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-weight: 600; margin-bottom: 8px; display: block;">Alert me when stock falls below:</label>
+                        <input type="number" id="thresholdInput" min="0"
+                               oninput="CreditsUI.updateThresholdPreview(parseInt(document.getElementById('thresholdCurrentStock').textContent), parseInt(this.value) || 0)"
+                               style="width: 100%; padding: 10px; font-size: 16px; border: 2px solid #e2e8f0; border-radius: 6px;">
+                        <div style="font-size: 13px; color: #718096; margin-top: 8px;">
+                            💡 <strong>Tip:</strong> Set to 0 for items you can restock quickly (e.g., Firestick from Best Buy). Set to 50-100 for services that need advance planning.
+                        </div>
+                    </div>
+
+                    <div id="thresholdPreview" style="margin-top: 20px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="CreditsUI.closeThresholdModal()" class="btn-secondary">Cancel</button>
+                    <button onclick="CreditsUI.saveThreshold()" class="btn-primary">💾 Save Threshold</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Dashboard Tab -->
         <div id="dashboard" class="tab-content active">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
@@ -239,7 +283,10 @@
                     <h3 style="margin: 0 0 15px 0; font-size: 16px;">⚠️ Action Needed</h3>
                     
                     <div style="margin-bottom: 20px;">
-                        <h4 style="font-size: 14px; color: #e53e3e; margin-bottom: 10px;">📉 Low Stock Alerts</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="font-size: 14px; color: #e53e3e; margin: 0;">📉 Low Stock Alerts</h4>
+                            <a href="#" onclick="showTab('credits'); return false;" style="font-size: 12px; color: #667eea; text-decoration: none;">Manage Inventory →</a>
+                        </div>
                         <div id="lowStockList"></div>
                     </div>
                     
@@ -328,6 +375,7 @@
             <!-- Sub-tabs for Customer Management -->
             <div class="customer-tabs">
                 <button class="tab-button active" onclick="showCustomerTab('customer-list')">📋 Customer List</button>
+                <button class="tab-button" onclick="showCustomerTab('customer-profile')" id="customerProfileTab" style="display: none;">👤 Customer Profile</button>
                 <button class="tab-button" onclick="showCustomerTab('add-customer')">➕ Add Customer</button>
                 <button class="tab-button" onclick="showCustomerTab('add-subscription')">📝 Add Subscription</button>
                 <button class="tab-button" onclick="showCustomerTab('edit-customer')">✏️ Edit Customer</button>
@@ -351,6 +399,13 @@
 
                 <!-- Customer List Display -->
                 <div id="customerListDisplay" class="customer-list"></div>
+            </div>
+
+            <!-- Customer Profile Sub-tab -->
+            <div id="customer-profile" class="customer-tab-content">
+                <div id="customerProfileContent">
+                    <div class="loading-message">Select a customer to view their profile</div>
+                </div>
             </div>
 
             <!-- Add Customer Sub-tab -->
@@ -893,6 +948,7 @@
     <script src="js/ui/credits.js"></script>
     <script src="js/ui/business.js"></script>
     <script src="js/ui/customers.js"></script>
+    <script src="js/ui/customer-profile.js?v=2"></script>
     <script src="js/ui/pos.js"></script>
     <script src="js/ui/support.js"></script>
     <script src="js/ui/settings.js"></script>

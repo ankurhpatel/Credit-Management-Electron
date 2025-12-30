@@ -143,12 +143,152 @@ class EmbeddedServer {
             try {
                 const { name, email, phone, address, status, internal_notes } = req.body;
                 this.db.prepare(`
-                    UPDATE customers 
+                    UPDATE customers
                     SET name = ?, email = ?, phone = ?, address = ?, status = ?, internal_notes = ?
                     WHERE id = ?
                 `).run([name, email, phone, address, status, internal_notes, req.params.customerId]);
                 res.json({ success: true });
             } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // Customer Profile Endpoint - Full Analytics
+        this.app.get('/api/customers/:customerId/profile', (req, res) => {
+            try {
+                const customerId = req.params.customerId;
+                console.log('📊 Loading profile for customer:', customerId);
+
+                // 1. Basic customer info
+                const customer = this.db.prepare('SELECT * FROM customers WHERE id = ?').get([customerId]);
+                if (!customer) {
+                    console.log('Customer not found:', customerId);
+                    return res.status(404).json({ error: 'Customer not found' });
+                }
+                console.log('Customer found:', customer.name);
+
+                // 2. All receipts/transactions (grouped by bundle)
+                const receipts = this.db.prepare(`
+                    SELECT
+                        s.id, s.bundle_id, s.service_name, s.vendor_service_name,
+                        s.amount_paid, s.credits_used, s.start_date,
+                        s.payment_status, s.payment_type, s.order_status,
+                        s.classification, s.mac_address, s.notes, s.created_date,
+                        v.name as vendor_name
+                    FROM subscriptions s
+                    LEFT JOIN vendors v ON s.vendor_id = v.vendor_id
+                    WHERE s.customer_id = ?
+                    ORDER BY s.created_date DESC
+                `).all([customerId]);
+
+                // Group by bundle
+                const bundleMap = {};
+                receipts.forEach(r => {
+                    const bundleId = r.bundle_id || r.id;
+                    if (!bundleMap[bundleId]) {
+                        bundleMap[bundleId] = {
+                            bundleId,
+                            date: r.created_date || r.start_date,
+                            items: [],
+                            total: 0,
+                            paymentStatus: r.payment_status,
+                            paymentType: r.payment_type,
+                            orderStatus: r.order_status
+                        };
+                    }
+                    bundleMap[bundleId].items.push(r);
+                    bundleMap[bundleId].total += parseFloat(r.amount_paid || 0);
+                });
+                const allReceipts = Object.values(bundleMap);
+
+                // 3. Lifetime analytics
+                const stats = this.db.prepare(`
+                    SELECT
+                        COUNT(DISTINCT bundle_id) as total_orders,
+                        SUM(amount_paid) as lifetime_value,
+                        AVG(amount_paid) as avg_order_value,
+                        MIN(start_date) as first_purchase,
+                        MAX(start_date) as last_purchase
+                    FROM subscriptions
+                    WHERE customer_id = ?
+                `).get([customerId]);
+
+                // 4. Active subscriptions
+                const activeSubscriptions = this.db.prepare(`
+                    SELECT
+                        s.id, s.service_name, s.vendor_service_name, s.start_date,
+                        s.credits_used, s.amount_paid, s.classification,
+                        v.name as vendor_name,
+                        COUNT(s2.id) as renewal_count
+                    FROM subscriptions s
+                    LEFT JOIN vendors v ON s.vendor_id = v.vendor_id
+                    LEFT JOIN subscriptions s2 ON s2.customer_id = s.customer_id
+                        AND s2.vendor_service_name = s.vendor_service_name
+                        AND s2.start_date <= s.start_date
+                    WHERE s.customer_id = ? AND s.status = 'active'
+                    GROUP BY s.id
+                    ORDER BY s.start_date DESC
+                `).all([customerId]);
+
+                // 5. Purchase history by year
+                const yearlyStats = this.db.prepare(`
+                    SELECT
+                        strftime('%Y', start_date) as year,
+                        COUNT(DISTINCT bundle_id) as orders,
+                        SUM(amount_paid) as revenue
+                    FROM subscriptions
+                    WHERE customer_id = ?
+                    GROUP BY year
+                    ORDER BY year DESC
+                `).all([customerId]);
+
+                // 6. Calculate renewal frequency (days between purchases)
+                let renewalFrequency = null;
+                if (receipts.length > 1) {
+                    const uniqueDates = [...new Set(receipts.map(r => r.start_date || r.created_date).filter(d => d))];
+                    const dates = uniqueDates.sort();
+                    if (dates.length > 1) {
+                        const intervals = [];
+                        for (let i = 1; i < dates.length; i++) {
+                            const diff = (new Date(dates[i]) - new Date(dates[i-1])) / (1000 * 60 * 60 * 24);
+                            if (diff > 0) intervals.push(diff);
+                        }
+                        if (intervals.length > 0) {
+                            renewalFrequency = Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length);
+                        }
+                    }
+                }
+
+                // 7. Days since last purchase
+                const daysSinceLastPurchase = stats.last_purchase
+                    ? Math.floor((new Date() - new Date(stats.last_purchase)) / (1000 * 60 * 60 * 24))
+                    : null;
+
+                // 8. Customer segment
+                const lifetimeValue = parseFloat(stats.lifetime_value || 0);
+                let segment = 'new';
+                if (stats.total_orders >= 10 && lifetimeValue >= 1000) segment = 'vip';
+                else if (daysSinceLastPurchase && daysSinceLastPurchase > 90) segment = 'at-risk';
+                else if (stats.total_orders >= 3) segment = 'regular';
+
+                res.json({
+                    customer,
+                    receipts: allReceipts,
+                    stats: {
+                        totalOrders: stats.total_orders || 0,
+                        lifetimeValue: lifetimeValue,
+                        avgOrderValue: parseFloat(stats.avg_order_value || 0),
+                        firstPurchase: stats.first_purchase,
+                        lastPurchase: stats.last_purchase,
+                        daysSinceLastPurchase,
+                        renewalFrequency,
+                        segment
+                    },
+                    activeSubscriptions,
+                    yearlyStats
+                });
+            } catch (error) {
+                console.error('Profile Error:', error);
                 res.status(500).json({ error: error.message });
             }
         });
@@ -258,6 +398,20 @@ class EmbeddedServer {
                 res.status(500).json({ error: error.message });
             }
         });
+
+        this.app.put('/api/vendor-services/:serviceId/threshold', (req, res) => {
+            try {
+                const { threshold } = req.body;
+                this.db.prepare(`
+                    UPDATE vendor_services
+                    SET low_stock_threshold = ?
+                    WHERE service_id = ?
+                `).run([threshold, req.params.serviceId]);
+                res.json({ success: true });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
     }
 
     setupSubscriptionRoutes() {
@@ -301,12 +455,60 @@ class EmbeddedServer {
             }
         });
 
+        this.app.put('/api/subscriptions/:id', (req, res) => {
+            try {
+                const transaction = this.db.transaction((data) => {
+                    const sub = this.db.prepare('SELECT * FROM subscriptions WHERE id = ?').get([req.params.id]);
+                    if (!sub) throw new Error('Subscription not found');
+
+                    // Calculate credit difference for inventory adjustment
+                    const oldCredits = sub.credits_used || 0;
+                    const newCredits = data.creditsUsed !== undefined ? data.creditsUsed : oldCredits;
+                    const creditDiff = newCredits - oldCredits;
+
+                    // Update subscription
+                    this.db.prepare(`
+                        UPDATE subscriptions
+                        SET credits_used = ?, amount_paid = ?, classification = ?, mac_address = ?,
+                            order_status = ?, payment_type = ?, payment_status = ?,
+                            transaction_id_ref = ?, notes = ?
+                        WHERE id = ?
+                    `).run([
+                        newCredits,
+                        data.amountPaid !== undefined ? data.amountPaid : sub.amount_paid,
+                        data.classification !== undefined ? data.classification : sub.classification,
+                        data.macAddress !== undefined ? data.macAddress : sub.mac_address,
+                        data.orderStatus !== undefined ? data.orderStatus : sub.order_status,
+                        data.paymentType !== undefined ? data.paymentType : sub.payment_type,
+                        data.paymentStatus !== undefined ? data.paymentStatus : sub.payment_status,
+                        data.transactionIdRef !== undefined ? data.transactionIdRef : sub.transaction_id_ref,
+                        data.notes !== undefined ? data.notes : sub.notes,
+                        req.params.id
+                    ]);
+
+                    // Adjust credit balance if credits changed
+                    if (creditDiff !== 0 && sub.vendor_id && sub.vendor_service_name) {
+                        this.db.prepare(`
+                            UPDATE credit_balances
+                            SET remaining_credits = remaining_credits - ?, total_used = total_used + ?
+                            WHERE vendor_id = ? AND service_name = ?
+                        `).run([creditDiff, creditDiff, sub.vendor_id, sub.vendor_service_name]);
+                    }
+                });
+
+                transaction(req.body);
+                res.json({ success: true });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         this.app.put('/api/subscriptions/:id/metadata', (req, res) => {
             try {
                 const { orderStatus, paymentType, paymentStatus, transactionIdRef, notes } = req.body;
                 this.db.prepare(`
-                    UPDATE subscriptions 
-                    SET order_status = ?, payment_type = ?, payment_status = ?, 
+                    UPDATE subscriptions
+                    SET order_status = ?, payment_type = ?, payment_status = ?,
                         transaction_id_ref = ?, notes = ?
                     WHERE id = ?
                 `).run([orderStatus, paymentType, paymentStatus, transactionIdRef, notes, req.params.id]);
@@ -491,11 +693,14 @@ class EmbeddedServer {
                 `).all(subParams);
 
                 const lowStock = this.db.prepare(`
-                    SELECT cb.service_name, cb.remaining_credits, v.name as vendor_name
+                    SELECT cb.service_name, cb.remaining_credits, v.name as vendor_name,
+                           COALESCE(vs.low_stock_threshold, 5) as threshold
                     FROM credit_balances cb
                     JOIN vendors v ON cb.vendor_id = v.vendor_id
-                    WHERE cb.remaining_credits < 10
-                    ORDER BY cb.remaining_credits ASC LIMIT 5
+                    LEFT JOIN vendor_services vs ON cb.vendor_id = vs.vendor_id
+                        AND cb.service_name = vs.service_name
+                    WHERE cb.remaining_credits <= COALESCE(vs.low_stock_threshold, 5)
+                    ORDER BY cb.remaining_credits ASC LIMIT 10
                 `).all();
 
                 res.json({

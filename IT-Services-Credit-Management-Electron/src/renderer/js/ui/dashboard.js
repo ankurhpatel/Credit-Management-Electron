@@ -110,16 +110,29 @@ class DashboardUI {
         if (!container) return;
 
         if (!items || items.length === 0) {
-            container.innerHTML = '<div style="font-size: 13px; color: #38a169; padding: 10px; background: #f0fff4; border-radius: 6px;">✅ Stock levels are healthy.</div>';
+            container.innerHTML = '<div style="font-size: 13px; color: #38a169; padding: 10px; background: #f0fff4; border-radius: 6px;">✅ All stock levels are above their alert thresholds.</div>';
             return;
         }
 
-        container.innerHTML = items.map(item => `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #edf2f7;">
-                <span style="font-size: 13px; color: #4a5568;">${item.service_name}</span>
-                <span style="font-size: 12px; font-weight: 700; color: #e53e3e; background: #fff5f5; padding: 2px 8px; border-radius: 10px;">${item.remaining_credits} left</span>
-            </div>
-        `).join('');
+        container.innerHTML = items.map(item => {
+            const stock = item.remaining_credits || 0;
+            const threshold = item.threshold || 5;
+            const isOutOfStock = stock === 0;
+            const icon = isOutOfStock ? '🔴' : '⚠️';
+            const bgColor = isOutOfStock ? '#fff5f5' : '#fffaf0';
+            const textColor = isOutOfStock ? '#c53030' : '#c05621';
+            const badgeColor = isOutOfStock ? '#e53e3e' : '#ed8936';
+
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #edf2f7; background: ${bgColor}; margin-bottom: 4px; border-radius: 6px;">
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600; color: #2d3748;">${icon} ${item.vendor_name} - ${item.service_name}</div>
+                        <div style="font-size: 11px; color: #718096; margin-top: 2px;">Alert threshold: ${threshold} units</div>
+                    </div>
+                    <span style="font-size: 12px; font-weight: 700; color: white; background: ${badgeColor}; padding: 4px 10px; border-radius: 12px; white-space: nowrap;">${stock} ${isOutOfStock ? '' : '/ ' + threshold}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     // Chart Logic

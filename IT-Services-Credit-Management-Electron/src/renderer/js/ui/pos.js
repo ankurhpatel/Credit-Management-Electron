@@ -6,7 +6,9 @@ class POSUI {
         balances: [],
         editingBundleId: null,
         editingSingleId: null,
-        isInitializing: false
+        isInitializing: false,
+        originalCart: [], // Track original items when editing an order
+        removedItems: [] // Track items removed from the original order
     };
 
     static async init() {
@@ -79,6 +81,55 @@ class POSUI {
         return balance ? (balance.remaining_credits || balance.RemainingCredits || 0) : 0;
     }
 
+    static filterServices() {
+        const input = document.getElementById('posServiceSearch');
+        const clearBtn = document.getElementById('posClearSearchBtn');
+        if (!input) return;
+
+        const query = input.value.trim().toLowerCase();
+
+        // Show/hide clear button
+        if (clearBtn) {
+            clearBtn.style.display = query ? 'block' : 'none';
+        }
+
+        // If empty, show all services
+        if (!query) {
+            this.renderCatalog(this.state.allServices);
+            return;
+        }
+
+        // Filter services by name, type, or vendor
+        const filtered = this.state.allServices.filter(service => {
+            const name = (service.service_name || '').toLowerCase();
+            const type = (service.item_type || 'subscription').toLowerCase();
+            const vendorName = (service.vendor_name || '').toLowerCase();
+            const price = (service.default_price || 0).toString();
+
+            return name.includes(query) || type.includes(query) || vendorName.includes(query) || price.includes(query);
+        });
+
+        this.renderCatalog(filtered);
+
+        // Show search result feedback
+        if (filtered.length === 0) {
+            const container = document.getElementById('posServiceCatalog');
+            if (container) {
+                container.innerHTML = `
+                    <div class="no-data" style="text-align: center; padding: 40px 20px; color: #718096;">
+                        <div style="font-size: 48px; margin-bottom: 15px;">🔍</div>
+                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No services found</div>
+                        <div style="font-size: 14px;">Try searching for "${query}" with different keywords</div>
+                        <button onclick="document.getElementById('posServiceSearch').value=''; POSUI.filterServices();"
+                                class="btn-small btn-secondary" style="margin-top: 15px;">Clear Search</button>
+                    </div>
+                `;
+            }
+        } else {
+            console.log(`🔍 Found ${filtered.length} service(s) matching "${query}"`);
+        }
+    }
+
     static renderCatalog(services) {
         const container = document.getElementById('posServiceCatalog');
         if (!container) return;
@@ -103,14 +154,17 @@ class POSUI {
                     <div class="service-grid">
                         ${group.items.map(service => {
                             const stock = this.getStock(service.vendor_id, service.service_name);
-                            const stockClass = stock <= 0 ? 'out-of-stock' : (stock < 5 ? 'low-stock' : 'in-stock');
+                            const threshold = service.low_stock_threshold !== undefined ? service.low_stock_threshold : 5;
+                            const stockClass = stock <= 0 ? 'out-of-stock' : (stock <= threshold ? 'low-stock' : 'in-stock');
+                            const stockIcon = stock <= 0 ? '🔴' : (stock <= threshold ? '⚠️' : '✅');
+
                             return `
-                                <div class="service-card type-${service.item_type} ${stockClass}" 
+                                <div class="service-card type-${service.item_type} ${stockClass}"
                                      onclick="POSUI.addToCart('${service.service_id}')">
                                     <div class="service-card-info">
                                         <h4 class="service-card-title">${service.service_name}</h4>
                                         <div class="service-card-price">$${(service.default_price || 0).toFixed(2)}</div>
-                                        <div class="service-card-stock">Stock: <strong>${stock}</strong></div>
+                                        <div class="service-card-stock">${stockIcon} Stock: <strong>${stock}</strong> ${stock <= threshold && stock > 0 ? '<span class="stock-warning">(Low!)</span>' : ''}</div>
                                     </div>
                                 </div>
                             `;
@@ -151,13 +205,15 @@ class POSUI {
 
             // 3. Clear existing POS state manually (bypass the auto-reset in init)
             this.state.cart = [];
+            this.state.originalCart = [];
+            this.state.removedItems = [];
             this.state.editingBundleId = type === 'bundle' ? id : null;
             this.state.editingSingleId = type === 'single' ? id : null;
 
             // 4. Fill state with fetched items
             this.state.cart = items.map(item => ({
                 id: item.id,
-                serviceId: '', 
+                serviceId: '',
                 name: item.service_name || item.ServiceName,
                 vendorId: item.vendor_id,
                 type: item.item_type || 'subscription',
@@ -165,8 +221,12 @@ class POSUI {
                 qty: item.credits_used || 1,
                 price: parseFloat(item.amount_paid) / (item.credits_used || 1),
                 classification: item.classification || '',
-                macAddress: item.mac_address || ''
+                macAddress: item.mac_address || '',
+                bundleId: item.bundle_id || item.BundleID
             }));
+
+            // Keep a copy of the original cart for comparison
+            this.state.originalCart = JSON.parse(JSON.stringify(this.state.cart));
 
             // 5. Select Customer (UI update)
             await this.selectCustomer(items[0].customer_id || items[0].CustomerID);
@@ -221,26 +281,31 @@ class POSUI {
             return;
         }
 
+        // Check if we're editing an existing order
+        const isEditingOrder = !!(this.state.editingBundleId || this.state.editingSingleId);
+
         container.innerHTML = this.state.cart.map((item, index) => {
             const isSub = item.type === 'subscription';
             const isExisting = !!item.id;
+            const isEditable = !isEditingOrder || !isExisting; // Allow editing new items or all items if not editing an order
+
             return `
                 <div class="cart-item-card type-${item.type} ${isExisting ? 'existing-item' : ''}">
                     <div class="cart-item-header">
                         <span class="cart-item-title"><strong>${item.name}</strong> ${isExisting ? '<small>(Original)</small>' : ''}</span>
-                        ${!isExisting ? `<button onclick="POSUI.removeFromCart(${index})" class="btn-icon">✕</button>` : ''}
+                        <button onclick="POSUI.removeFromCart(${index})" class="btn-icon" title="${isExisting ? 'Remove existing item' : 'Remove item'}">✕</button>
                     </div>
-                    
+
                     <div class="cart-item-body">
                         <div class="cart-item-row">
                             <label>${isSub ? 'Months' : 'Qty'}:</label>
-                            <input type="number" value="${isSub ? item.duration : item.qty}" min="1" ${isExisting ? 'disabled' : ''}
+                            <input type="number" value="${isSub ? item.duration : item.qty}" min="1"
                                    onchange="POSUI.updateCartItem(${index}, '${isSub ? 'duration' : 'qty'}', this.value)">
                         </div>
-                        
+
                         <div class="cart-item-row">
                             <label>Unit Price ($):</label>
-                            <input type="number" value="${item.price}" step="0.01" ${isExisting ? 'disabled' : ''}
+                            <input type="number" value="${item.price}" step="0.01"
                                    onchange="POSUI.updateCartItem(${index}, 'price', this.value)">
                         </div>
 
@@ -286,20 +351,77 @@ class POSUI {
             };
 
             if (isUpdate) {
+                // Step 1: Delete removed items
+                for (const removedId of this.state.removedItems) {
+                    await fetch(`/api/subscriptions/${removedId}`, {
+                        method: 'DELETE'
+                    });
+                    console.log(`✅ Deleted item: ${removedId}`);
+                }
+
+                // Step 2: Update existing items and add new items
+                const bundleID = this.state.editingBundleId || this.state.cart[0]?.bundleId || 'BNDL-' + Date.now();
+
+                for (const item of this.state.cart) {
+                    const q = item.type === 'subscription' ? item.duration : item.qty;
+
+                    if (item.id) {
+                        // Existing item - update it
+                        await fetch(`/api/subscriptions/${item.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                creditsUsed: q,
+                                amountPaid: q * item.price,
+                                classification: item.classification,
+                                macAddress: item.macAddress,
+                                orderStatus: meta.orderStatus,
+                                paymentType: meta.paymentType,
+                                paymentStatus: meta.paymentStatus,
+                                transactionIdRef: meta.transactionIdRef,
+                                notes: meta.notes
+                            })
+                        });
+                        console.log(`✅ Updated item: ${item.id}`);
+                    } else {
+                        // New item - create it
+                        await fetch('/api/subscriptions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                customerID: this.state.selectedCustomer.id,
+                                serviceName: item.type === 'subscription' ? 'IT App Services' : `${item.type.toUpperCase()}: ${item.name}`,
+                                vendorID: item.vendorId,
+                                vendorServiceName: item.name,
+                                startDate: new Date().toISOString().split('T')[0],
+                                creditsSelected: q,
+                                amountPaid: q * item.price,
+                                classification: item.classification,
+                                macAddress: item.macAddress,
+                                notes: meta.notes,
+                                status: 'active',
+                                itemType: item.type,
+                                bundleID: bundleID,
+                                orderStatus: meta.orderStatus,
+                                paymentType: meta.paymentType,
+                                paymentStatus: meta.paymentStatus,
+                                transactionIdRef: meta.transactionIdRef
+                            })
+                        });
+                        console.log(`✅ Added new item: ${item.name}`);
+                    }
+                }
+
+                // Step 3: Update bundle metadata if needed
                 if (this.state.editingBundleId) {
                     await fetch(`/api/bundles/${this.state.editingBundleId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(meta)
                     });
-                } else {
-                    await fetch(`/api/subscriptions/${this.state.editingSingleId}/metadata`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(meta)
-                    });
                 }
-                Alerts.showSuccess('Order Updated', 'The order has been updated and processed.');
+
+                Alerts.showSuccess('Order Updated', 'The order has been updated successfully.');
             } else {
                 const bundleID = 'BNDL-' + Date.now();
                 for (const item of this.state.cart) {
@@ -346,6 +468,8 @@ class POSUI {
         this.state.selectedCustomer = null;
         this.state.editingBundleId = null;
         this.state.editingSingleId = null;
+        this.state.originalCart = [];
+        this.state.removedItems = [];
         this.clearCustomer();
         this.renderCart();
         ['posOrderNotes', 'posTransactionIdRef'].forEach(id => {
@@ -445,13 +569,32 @@ class POSUI {
         POSUI.searchCustomers();
     }
 
-    static removeFromCart(index) { this.state.cart.splice(index, 1); this.renderCart(); }
+    static removeFromCart(index) {
+        const item = this.state.cart[index];
+        if (!item) return;
+
+        // If the item has an ID, it's an existing item - track it for deletion
+        if (item.id) {
+            this.state.removedItems.push(item.id);
+            console.log(`🗑️ Marked item ${item.id} (${item.name}) for deletion`);
+        }
+
+        this.state.cart.splice(index, 1);
+        this.renderCart();
+    }
     static updateCartItem(index, field, value) {
         const item = this.state.cart[index];
         if (!item) return;
+
+        const oldValue = item[field];
         if (field === 'qty' || field === 'duration') item[field] = parseInt(value) || 1;
         else if (field === 'price') item[field] = parseFloat(value) || 0;
         else item[field] = value;
+
+        if (item.id) {
+            console.log(`✏️ Modified existing item ${item.id}: ${field} ${oldValue} → ${item[field]}`);
+        }
+
         this.renderCart();
     }
 }

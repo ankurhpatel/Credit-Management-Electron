@@ -64,7 +64,7 @@ class CustomersUI {
             return `
                 <div class="customer-card ${!isActive ? 'inactive' : ''}" data-customer-id="${customer.id || customer.CustomerID}">
                     <div class="customer-header">
-                        <h4 class="customer-name">${customer.name || customer.Name}</h4>
+                        <h4 class="customer-name" style="cursor: pointer; color: #667eea;" onclick="CustomerProfileUI.loadProfile('${customer.id || customer.CustomerID}')" title="Click to view full profile">${customer.name || customer.Name}</h4>
                         <div class="customer-status ${status}">
                             ${status.toUpperCase()}
                         </div>
@@ -81,8 +81,8 @@ class CustomersUI {
                         </div>
                     </div>
                     <div class="customer-actions">
+                        <button onclick="CustomerProfileUI.loadProfile('${customer.id || customer.CustomerID}')" class="btn-small btn-info" style="font-weight: 600;">👤 View Profile</button>
                         <button onclick="editCustomerById('${customer.id || customer.CustomerID}')" class="btn-small btn-primary">✏️ Edit</button>
-                        <button onclick="viewCustomerTransactionsById('${customer.id || customer.CustomerID}')" class="btn-small btn-info">📄 View Receipts</button>
                         <button onclick="printCustomerReceiptById('${customer.id || customer.CustomerID}')" class="btn-small btn-secondary">🖨️ Print Receipt</button>
                         ${isActive ?
                     `<button onclick="addSubscriptionForCustomer('${customer.id || customer.CustomerID}')" class="btn-small btn-success">📝 Add Subscription</button>`

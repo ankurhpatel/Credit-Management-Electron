@@ -97,6 +97,12 @@ class DatabaseManager {
                 this.db.exec("ALTER TABLE vendor_services ADD COLUMN cost_price REAL DEFAULT 0");
             }
 
+            const hasLowStockThreshold = vsColumns.some(c => c.name === 'low_stock_threshold');
+            if (!hasLowStockThreshold) {
+                console.log('⚠️ Adding low_stock_threshold to vendor_services...');
+                this.db.exec("ALTER TABLE vendor_services ADD COLUMN low_stock_threshold INTEGER DEFAULT 5");
+            }
+
             // Check subscriptions columns
             const subColumns = this.prepare('PRAGMA table_info(subscriptions)').all();
             const hasSubItemType = subColumns.some(c => c.name === 'item_type');

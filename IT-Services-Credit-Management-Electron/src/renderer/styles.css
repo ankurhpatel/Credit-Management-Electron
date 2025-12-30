@@ -2012,25 +2012,9 @@ body {
 
     .customer-card, .vendor-card, .stat-card, .classification-group {
         page-break-inside: avoid;
-    }
-
-    .font-bold {
-    font-weight: 700;
-}
-
-.pnl-breakdown-box h5 {
-    border-bottom: 1px solid #edf2f7;
-    padding-bottom: 8px;
-    font-weight: 700;
-}
-
-.pnl-breakdown-box span {
-    font-size: 14px;
-}
         border-radius: 0 !important;
         padding: 15px !important;
         margin-bottom: 15px !important;
-        page-break-inside: avoid;
     }
 
         .credit-balance-item.low-credit {
@@ -2055,6 +2039,21 @@ body {
     .modal-backdrop, .search-dropdown {
         display: none !important;
     }
+}
+
+/* Regular styles (not for print) */
+.font-bold {
+    font-weight: 700;
+}
+
+.pnl-breakdown-box h5 {
+    border-bottom: 1px solid #edf2f7;
+    padding-bottom: 8px;
+    font-weight: 700;
+}
+
+.pnl-breakdown-box span {
+    font-size: 14px;
 }
 
 /* Modal styles for receipt display */

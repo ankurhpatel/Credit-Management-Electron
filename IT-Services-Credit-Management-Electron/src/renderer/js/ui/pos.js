@@ -15,6 +15,7 @@ class POSUI {
         
         console.log('🛒 Initializing POS...');
         await this.loadCatalog();
+        this.attachCustomerSearch();
         
         // Only reset if we AREN'T currently loading an order from history
         if (!this.state.editingBundleId && !this.state.editingSingleId) {
@@ -41,6 +42,32 @@ class POSUI {
             this.renderCatalog(this.state.allServices);
         } catch (error) {
             console.error('❌ Error loading POS data:', error);
+        }
+    }
+
+    static attachCustomerSearch() {
+        if (this._customerSearchAttached) return;
+        const input = document.getElementById('posCustomerSearch');
+        const dropdown = document.getElementById('posCustomerDropdown');
+        if (!input || !dropdown) return;
+
+        input.addEventListener('input', () => POSUI.searchCustomers());
+        input.addEventListener('focus', () => POSUI.searchCustomers());
+        this._customerSearchAttached = true;
+    }
+
+    static async getCustomerList() {
+        const cached = Store.getCustomers();
+        if (cached && cached.length) return cached;
+
+        try {
+            const res = await fetch('/api/customers');
+            const customers = await res.json();
+            Store.setCustomers(customers);
+            return customers;
+        } catch (error) {
+            console.error('Error loading customers:', error);
+            return [];
         }
     }
 
@@ -332,14 +359,38 @@ class POSUI {
     }
 
     static async searchCustomers() {
-        const q = document.getElementById('posCustomerSearch').value.toLowerCase();
-        const d = document.getElementById('posCustomerDropdown');
-        if (q.length < 2) { d.style.display = 'none'; return; }
-        const res = await fetch('/api/customers');
-        const custs = await res.json();
-        const filtered = custs.filter(c => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
-        d.innerHTML = filtered.map(c => `<div class="dropdown-item" onclick="POSUI.selectCustomer('${c.id}')"><strong>${c.name}</strong><br><small>${c.email}</small></div>`).join('');
-        d.style.display = 'block';
+        const input = document.getElementById('posCustomerSearch');
+        const dropdown = document.getElementById('posCustomerDropdown');
+        if (!input || !dropdown) return;
+
+        const q = input.value.trim().toLowerCase();
+        const custs = await this.getCustomerList();
+
+        if (!custs.length) {
+            dropdown.innerHTML = '<div class="dropdown-item no-results">No customers available</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        const filtered = (q.length ? custs.filter(c => {
+            const name = (c.name || c.Name || '').toLowerCase();
+            const email = (c.email || c.Email || '').toLowerCase();
+            const phone = (c.phone || c.Phone || '').toString().toLowerCase();
+            const id = (c.id || c.CustomerID || '').toString().toLowerCase();
+            return name.includes(q) || email.includes(q) || phone.includes(q) || id.includes(q);
+        }) : custs).slice(0, 50);
+
+        dropdown.innerHTML = filtered.length
+            ? filtered.map(c => {
+                const id = c.id || c.CustomerID;
+                const name = c.name || c.Name || 'Unknown';
+                const email = c.email || c.Email || '';
+                const phone = c.phone || c.Phone || '';
+                const meta = email ? email : phone;
+                return `<div class="dropdown-item" onclick="POSUI.selectCustomer('${id}')"><strong>${name}</strong><br><small>${meta}</small></div>`;
+            }).join('')
+            : '<div class="dropdown-item no-results">No matching customers</div>';
+        dropdown.style.display = 'block';
     }
 
     static async selectCustomer(customerId) {
@@ -354,8 +405,8 @@ class POSUI {
         if (searchWrapper) searchWrapper.style.display = 'none';
         if (selectedCard) {
             selectedCard.style.display = 'flex';
-            selectedCard.querySelector('.customer-name-display').textContent = customer.name;
-            selectedCard.querySelector('.customer-email-display').textContent = customer.email;
+            selectedCard.querySelector('.customer-name-display').textContent = customer.name || customer.Name || '';
+            selectedCard.querySelector('.customer-email-display').textContent = customer.email || customer.Email || '';
         }
 
         // Intelligence
@@ -388,7 +439,10 @@ class POSUI {
     }
 
     static showCustomerDropdown() {
-        if (document.getElementById('posCustomerSearch').value.length >= 2) document.getElementById('posCustomerDropdown').style.display = 'block';
+        const input = document.getElementById('posCustomerSearch');
+        const dropdown = document.getElementById('posCustomerDropdown');
+        if (!input || !dropdown) return;
+        POSUI.searchCustomers();
     }
 
     static removeFromCart(index) { this.state.cart.splice(index, 1); this.renderCart(); }

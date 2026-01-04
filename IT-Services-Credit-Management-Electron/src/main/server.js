@@ -385,6 +385,20 @@ class EmbeddedServer {
             }
         });
 
+        this.app.get('/api/vendor-services/:vendorId', (req, res) => {
+            try {
+                const services = this.db.prepare(`
+                    SELECT vs.*, v.name as vendor_name 
+                    FROM vendor_services vs
+                    JOIN vendors v ON vs.vendor_id = v.vendor_id
+                    WHERE vs.vendor_id = ? AND vs.is_available = 1
+                `).all([req.params.vendorId]);
+                res.json(services);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         this.app.post('/api/vendor-services', (req, res) => {
             try {
                 const { vendorID, serviceName, description, itemType, defaultPrice, costPrice } = req.body;

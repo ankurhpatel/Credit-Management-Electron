@@ -276,21 +276,28 @@ function loadServicesForPurchaseVendor() {
 
     if (vendorId) {
         // Fetch services for this vendor
-        fetch(`/api/vendor-services/${vendorId}`).then(res => res.json()).then(services => {
-            console.log('📦 API returned services:', services);
-            services.forEach(service => {
-                const option = document.createElement('option');
-                const name = service.service_name || service.ServiceName;
-                const type = service.item_type || service.ItemType || 'subscription';
-                
-                option.value = name;
-                option.textContent = name;
-                option.setAttribute('data-type', type); // Explicit attribute
-                option.dataset.type = type; // Dataset property
-                serviceSelect.appendChild(option);
-            });
-            VendorsUI.updatePurchaseLabels();
-        }).catch(err => console.error('Error loading services for purchase:', err));
+        fetch(`/api/vendor-services/${vendorId}`)
+            .then(res => res.json())
+            .then(services => {
+                if (!Array.isArray(services)) {
+                    console.error('Expected array of services but got:', services);
+                    return;
+                }
+                console.log('📦 API returned services:', services);
+                services.forEach(service => {
+                    const option = document.createElement('option');
+                    const name = service.service_name || service.ServiceName;
+                    const type = service.item_type || service.ItemType || 'subscription';
+                    
+                    option.value = name;
+                    option.textContent = name;
+                    option.setAttribute('data-type', type); // Explicit attribute
+                    option.dataset.type = type; // Dataset property
+                    serviceSelect.appendChild(option);
+                });
+                VendorsUI.updatePurchaseLabels();
+            })
+            .catch(err => console.error('Error loading services for purchase:', err));
     }
 }
 

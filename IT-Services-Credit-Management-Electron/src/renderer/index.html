@@ -851,6 +851,7 @@
             <div class="customer-tabs">
                 <button class="tab-button active" onclick="showSettingsTab('app-settings')">🖥️ App Settings</button>
                 <button class="tab-button" onclick="showSettingsTab('receipt-settings')">🧾 Receipt Settings</button>
+                <button class="tab-button" onclick="showSettingsTab('db-settings')">🗄️ Database</button>
             </div>
 
             <!-- App Settings -->
@@ -920,6 +921,43 @@
                     </div>
                 </form>
             </div>
+
+            <!-- Database Settings -->
+            <div id="db-settings" class="settings-section" style="display: none;">
+                <div style="display: flex; gap: 20px; height: 600px;">
+                    <!-- Sidebar: Table List -->
+                    <div style="width: 250px; border-right: 1px solid #e2e8f0; padding-right: 20px; overflow-y: auto;">
+                        <h3 style="margin-top: 0;">📋 Tables</h3>
+                        <div id="dbTableList" class="db-table-list">
+                            <div class="loading-message">Loading tables...</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Content: Data & Query -->
+                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                        
+                        <!-- Query Box -->
+                        <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0;">
+                            <h3 style="margin-top: 0;">⌨️ SQL Execution</h3>
+                            <div style="display: flex; gap: 10px;">
+                                <textarea id="dbSqlInput" rows="3" style="flex: 1; font-family: monospace; padding: 10px;" placeholder="SELECT * FROM customers WHERE..."></textarea>
+                                <button onclick="DBSettingsUI.executeQuery()" class="btn-primary" style="height: auto;">▶️ Run</button>
+                            </div>
+                        </div>
+
+                        <!-- Data Grid -->
+                        <div style="flex: 1; overflow: auto;">
+                            <h3 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+                                <span id="dbCurrentTableName">📊 Data View</span>
+                                <small id="dbRowCount" style="color: #718096; font-weight: normal;"></small>
+                            </h3>
+                            <div id="dbDataGrid" class="db-data-grid">
+                                <div class="placeholder-text">Select a table to view data</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -952,6 +990,7 @@
     <script src="js/ui/pos.js"></script>
     <script src="js/ui/support.js"></script>
     <script src="js/ui/settings.js"></script>
+    <script src="js/ui/db-settings.js"></script>
     <script src="js/app.js"></script>
 
 </body>

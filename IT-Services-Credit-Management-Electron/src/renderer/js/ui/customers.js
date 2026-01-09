@@ -83,10 +83,9 @@ class CustomersUI {
                     <div class="customer-actions">
                         <button onclick="CustomerProfileUI.loadProfile('${customer.id || customer.CustomerID}')" class="btn-small btn-info" style="font-weight: 600;">👤 View Profile</button>
                         <button onclick="editCustomerById('${customer.id || customer.CustomerID}')" class="btn-small btn-primary">✏️ Edit</button>
-                        <button onclick="printCustomerReceiptById('${customer.id || customer.CustomerID}')" class="btn-small btn-secondary">🖨️ Print Receipt</button>
                         ${isActive ?
                     `<button onclick="addSubscriptionForCustomer('${customer.id || customer.CustomerID}')" class="btn-small btn-success">📝 Add Subscription</button>`
-                    : '<span class="inactive-label">Inactive Customer</span>'
+                    : `<button onclick="reactivateCustomer('${customer.id || customer.CustomerID}')" class="btn-small btn-success">✅ Activate</button>`
                 }
                     </div>
                 </div>
@@ -284,22 +283,24 @@ class CustomersUI {
 
     static async addSubscriptionForCustomer(customerId) {
         try {
-            // Switch to add subscription tab
-            Tabs.showCustomerTab('add-subscription');
+            console.log(`🔄 Redirecting to POS for customer: ${customerId}`);
+            
+            // Switch to POS tab and wait for it to initialize
+            if (window.Tabs) {
+                await Tabs.showTab('pos');
+            } else {
+                showTab('pos');
+                // Fallback delay if Tabs class isn't directly accessible (shouldn't happen)
+                await new Promise(r => setTimeout(r, 500));
+            }
 
-            // Pre-select the customer and ensure services are loaded
-            setTimeout(async () => {
-                // Ensure services are loaded
-                if (this.vendorServices.length === 0) {
-                    console.log('🔧 No vendor services loaded, reloading...');
-                    await this.loadVendorServices();
-                }
-
-                // Pre-select the customer
-                this.selectCustomerForSubscription(customerId);
-                
-                console.log(`✅ Pre-selected customer ${customerId} for subscription`);
-            }, 100);
+            // Now that POS init (and its resetForm) is done, select the customer
+            if (window.POSUI) {
+                // We don't need to reset here because POSUI.init() already did it
+                await POSUI.selectCustomer(customerId);
+                console.log(`✅ Customer ${customerId} selected in POS`);
+                Alerts.showInfo('Customer Selected', 'You are now in POS mode for this customer.');
+            }
         } catch (error) {
             console.error('❌ Error adding subscription for customer:', error);
         }
@@ -384,6 +385,22 @@ class CustomersUI {
         } catch (error) {
             console.error('❌ Error deleting customer:', error);
             Alerts.showError('Delete Error', 'Failed to delete customer');
+        }
+    }
+
+    static async reactivateCustomer(customerId) {
+        if (!customerId) return;
+
+        if (!confirm('Are you sure you want to reactivate this customer?')) return;
+
+        try {
+            console.log(`🔄 Reactivating customer: ${customerId}`);
+            await CustomersAPI.updateCustomerStatus(customerId, 'active');
+            Alerts.showSuccess('Customer Activated', 'Customer is now active');
+            await this.loadAndDisplayCustomers();
+        } catch (error) {
+            console.error('❌ Error activating customer:', error);
+            Alerts.showError('Activation Error', 'Failed to activate customer');
         }
     }
 
@@ -481,6 +498,10 @@ function printCustomerReceiptById(customerId) {
 
 function addSubscriptionForCustomer(customerId) {
     CustomersUI.addSubscriptionForCustomer(customerId);
+}
+
+function reactivateCustomer(customerId) {
+    CustomersUI.reactivateCustomer(customerId);
 }
 
 function calculateExpirationDateSub() {

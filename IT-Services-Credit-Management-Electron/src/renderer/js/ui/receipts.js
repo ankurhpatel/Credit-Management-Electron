@@ -55,8 +55,8 @@ class ReceiptUI {
                     <div class="pro-receipt-title" style="text-align: right;">
                         <h1 style="margin: 0; font-size: 28px; color: #cbd5e0; font-weight: 900; text-transform: uppercase; letter-spacing: 2px;">Invoice</h1>
                         <div style="margin-top: 15px; font-size: 13px; color: #4a5568;">
-                            <p style="margin: 0;"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                            <p style="margin: 4px 0;"><strong>Invoice #:</strong> <span style="font-family: monospace; color: #718096;">${Date.now().toString().substr(-6)}</span></p>
+                            <p style="margin: 0;"><strong>Date:</strong> ${items[0]?.start_date ? new Date(items[0].start_date).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                            <p style="margin: 4px 0;"><strong>Invoice #:</strong> <span style="font-family: monospace; color: #718096;">${items[0]?.bundle_id ? items[0].bundle_id.substring(items[0].bundle_id.length - 6) : Date.now().toString().substr(-6)}</span></p>
                         </div>
                     </div>
                 </div>

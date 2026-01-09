@@ -632,7 +632,7 @@ class PrintManager {
         }
     }
 
-    // Print specific customer receipt
+    // Print specific customer receipt (Legacy - prints everything)
     static async printCustomerReceipt(customerId) {
         try {
             console.log(`🖨️ Printing customer receipt: ${customerId}`);
@@ -671,6 +671,51 @@ class PrintManager {
         } catch (error) {
             console.error('❌ Error printing customer receipt:', error);
             Alerts.showError('Print Error', 'Failed to print customer receipt');
+        }
+    }
+
+    // NEW: Print specific bundle receipt (Prints only one transaction)
+    static async printBundleReceipt(bundleId) {
+        try {
+            console.log(`🖨️ Printing bundle receipt: ${bundleId}`);
+
+            const res = await fetch(`/api/bundles/${bundleId}`);
+            const items = await res.json();
+
+            if (!items || items.length === 0) {
+                Alerts.showError('No Data', 'Transaction record not found');
+                return;
+            }
+
+            const customerId = items[0].customer_id || items[0].CustomerID;
+            const customerRes = await fetch(`/api/customers/${customerId}`);
+            const customer = await customerRes.json();
+
+            const fullData = {
+                customer: customer,
+                subscriptions: items,
+                summary: {
+                    totalPaid: items.reduce((sum, sub) => sum + parseFloat(sub.amount_paid || 0), 0)
+                }
+            };
+
+            const tempContainer = document.createElement('div');
+            tempContainer.id = 'temp-bundle-receipt-container';
+            tempContainer.style.display = 'none';
+            document.body.appendChild(tempContainer);
+
+            ReceiptUI.renderCustomerReceipt(fullData, tempContainer);
+            await this.printContent('temp-bundle-receipt-container', `Invoice - ${customer.name}`);
+
+            setTimeout(() => {
+                if (document.body.contains(tempContainer)) {
+                    document.body.removeChild(tempContainer);
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('❌ Error printing bundle receipt:', error);
+            Alerts.showError('Print Error', 'Failed to print invoice');
         }
     }
 

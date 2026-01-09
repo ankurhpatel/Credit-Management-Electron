@@ -53,7 +53,56 @@ class EmbeddedServer {
         this.setupBusinessRoutes();
         this.setupCreditRoutes();
         this.setupSettingsRoutes();
+        this.setupDatabaseRoutes();
         this.setupUtilityRoutes();
+    }
+
+    setupDatabaseRoutes() {
+        this.app.get('/api/database/tables', (req, res) => {
+            try {
+                const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all();
+                res.json(tables.map(t => t.name));
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        this.app.get('/api/database/table/:name', (req, res) => {
+            try {
+                const tableName = req.params.name;
+                // Basic SQL injection protection: validate table name against existing tables
+                const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(t => t.name);
+                if (!tables.includes(tableName)) {
+                    return res.status(404).json({ error: 'Table not found' });
+                }
+
+                const data = this.db.prepare(`SELECT * FROM ${tableName}`).all();
+                res.json(data);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        this.app.post('/api/database/execute', (req, res) => {
+            try {
+                const { sql } = req.body;
+                if (!sql) return res.status(400).json({ error: 'SQL query required' });
+
+                // Simple check to prevent completely dropping the database logic, 
+                // though user asked for "edit it also" so we allow updates/deletes.
+                // We should probably allow SELECTs to return data and others to return change counts.
+
+                if (sql.trim().toLowerCase().startsWith('select')) {
+                    const data = this.db.prepare(sql).all();
+                    res.json({ type: 'SELECT', data });
+                } else {
+                    const info = this.db.prepare(sql).run();
+                    res.json({ type: 'EXECUTE', changes: info.changes });
+                }
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
     }
 
     setupSettingsRoutes() {
@@ -133,7 +182,7 @@ class EmbeddedServer {
                     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
                 `).run([customerId, name, email, phone || '', address || '', internal_notes || '']);
 
-                res.status(201).json({ success: true, id: customerId });
+                res.status(201).json({ success: true, id: customerId, message: 'Customer created successfully' });
             } catch (error) {
                 res.status(500).json({ error: error.message });
             }
@@ -147,6 +196,20 @@ class EmbeddedServer {
                     SET name = ?, email = ?, phone = ?, address = ?, status = ?, internal_notes = ?
                     WHERE id = ?
                 `).run([name, email, phone, address, status, internal_notes, req.params.customerId]);
+                res.json({ success: true });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        this.app.put('/api/customers/:customerId/status', (req, res) => {
+            try {
+                const { status } = req.body;
+                this.db.prepare(`
+                    UPDATE customers
+                    SET status = ?
+                    WHERE id = ?
+                `).run([status, req.params.customerId]);
                 res.json({ success: true });
             } catch (error) {
                 res.status(500).json({ error: error.message });

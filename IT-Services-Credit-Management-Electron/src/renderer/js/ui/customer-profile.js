@@ -220,6 +220,17 @@ class CustomerProfileUI {
             };
             const statusColor = statusColors[receipt.paymentStatus] || statusColors['Pending'];
 
+            // Determine if this is a bundle (has bundle_id) or legacy single item
+            const firstItem = receipt.items[0];
+            const hasBundleId = !!firstItem.bundle_id;
+            
+            // If it has a bundle_id, use printBundleReceipt. 
+            // If not (legacy), use printSingleTransaction with the first item's ID.
+            // Note: receipt.bundleId from backend is either bundle_id or the item id if bundle_id is missing.
+            const printAction = hasBundleId 
+                ? `PrintManager.printBundleReceipt('${receipt.bundleId}')`
+                : `PrintManager.printSingleTransaction('${this.currentProfile.customer.id}', '${firstItem.id}')`;
+
             return `
                 <div style="padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
@@ -242,7 +253,7 @@ class CustomerProfileUI {
                         ${receipt.items.map(item => `• ${item.vendor_service_name || item.service_name}`).join('<br>')}
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button onclick="PrintManager.printCustomerReceipt('${this.currentProfile.customer.id}')" class="btn-small btn-secondary" style="font-size: 11px; padding: 4px 10px;">🖨️ Print</button>
+                        <button onclick="${printAction}" class="btn-small btn-secondary" style="font-size: 11px; padding: 4px 10px;">🖨️ Print</button>
                     </div>
                 </div>
             `;

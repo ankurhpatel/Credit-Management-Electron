@@ -147,7 +147,8 @@ class TransactionUI {
 
             const displayList = standalone.map(s => ({ ...s, isBundle: false }));
             Object.entries(groups).forEach(([bid, items]) => {
-                if (items.length > 0) {
+                if (items.length > 1) {
+                    // It's a real bundle/combo
                     const first = items[0];
                     const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.amount_paid || 0), 0);
                     const itemNames = items.map(i => i.service_name || 'Item').join(' + ');
@@ -157,6 +158,13 @@ class TransactionUI {
                         service_name: `📦 COMBO: ${itemNames}`,
                         amount_paid: totalAmount,
                         bundleItems: items
+                    });
+                } else if (items.length === 1) {
+                    // It has a bundle ID but only 1 item -> Treat as standalone
+                    const item = items[0];
+                    displayList.push({
+                        ...item,
+                        isBundle: false // Treat as single item
                     });
                 }
             });
@@ -371,7 +379,7 @@ class TransactionUI {
                                 <td style="padding: 10px; text-align: right;">${TransactionUI.formatCurrency(sale.amount_paid)}</td>
                                 <td style="padding: 10px; text-align: center;">
                                     ${sale.order_status === 'Open' ? `<button onclick="TransactionUI.closeOrder('${sale.isBundle ? 'bundle' : 'single'}', '${sale.bundle_id || sale.id}')" class="btn-icon" style="color: #48bb78;">✅</button>` : ''}
-                                    <button onclick="${sale.isBundle ? `PrintManager.printCustomerReceipt('${sale.customer_id}')` : `PrintManager.printSingleTransaction('${sale.customer_id}', '${sale.id}')`}" class="btn-icon">🖨️</button>
+                                    <button onclick="${sale.isBundle ? `PrintManager.printBundleReceipt('${sale.bundle_id}')` : `PrintManager.printSingleTransaction('${sale.customer_id}', '${sale.id}')`}" class="btn-icon">🖨️</button>
                                     <button onclick="TransactionUI.deleteTransaction('${sale.isBundle ? 'customer-bundle' : 'customer'}', '${sale.bundle_id || sale.id}')" class="btn-icon" style="color: #e53e3e;">🗑️</button>
                                 </td>
                             </tr>

@@ -309,9 +309,16 @@ class POSUI {
                                    onchange="POSUI.updateCartItem(${index}, 'price', this.value)">
                         </div>
 
-                        <div class="cart-item-row" style="grid-column: span 2;">
+                        <div class="cart-item-row" style="grid-column: span 2; margin-top: 5px;">
+                            <label style="color: #667eea; font-weight: 700;">🖥️ Device Name / MAC:</label>
+                            <input type="text" value="${item.macAddress || ''}" placeholder="e.g. Living Room TV or MAC Address"
+                                   onchange="POSUI.updateCartItem(${index}, 'macAddress', this.value)"
+                                   style="width: 100%; padding: 8px; border: 2px solid #e2e8f0; border-radius: 6px; background: #f8fafc;">
+                        </div>
+
+                        <div class="cart-item-row" style="grid-column: span 2; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #edf2f7;">
                             <label>Subtotal:</label>
-                            <div style="font-weight: 700; color: #2d3748;">$${((isSub ? item.duration : item.qty) * item.price).toFixed(2)}</div>
+                            <div style="font-weight: 700; color: #2d3748; font-size: 14px;">$${((isSub ? item.duration : item.qty) * item.price).toFixed(2)}</div>
                         </div>
                     </div>
                 </div>
@@ -453,7 +460,18 @@ class POSUI {
                 Alerts.showSuccess('Sale Complete', 'Transaction recorded.');
             }
 
-            await PrintManager.printCustomerReceipt(this.state.selectedCustomer.id);
+            // PRINT ONLY THE CURRENT BUNDLE (Prevents old items appearing on receipt)
+            const currentBundleID = isUpdate 
+                ? (this.state.editingBundleId || this.state.cart[0]?.bundleId)
+                : lastUsedBundleID;
+            
+            if (currentBundleID) {
+                await PrintManager.printBundleReceipt(currentBundleID);
+            } else {
+                // Fallback to customer ID if bundle fails
+                await PrintManager.printCustomerReceipt(this.state.selectedCustomer.id);
+            }
+            
             this.resetForm();
         } catch (error) {
             Alerts.showError('Failed', error.message);

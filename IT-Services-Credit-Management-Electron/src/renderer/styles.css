@@ -1202,7 +1202,7 @@ body {
 }
 
 .pos-left {
-    flex: 2;
+    flex: 1.4;
     background: white;
     border-radius: 12px;
     display: flex;
@@ -1216,9 +1216,9 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    min-width: 350px;
-    overflow-y: auto;
-    padding-right: 5px; /* Space for scrollbar */
+    min-width: 400px;
+    /* overflow-y: auto; REMOVED to allow dropdown overflow */
+    padding-right: 5px; 
 }
 
 .pos-section-header {
@@ -1235,8 +1235,14 @@ body {
     padding: 8px 12px;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
-    width: 200px;
     font-size: 14px;
+}
+
+.pos-section-header input:focus {
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+    outline: none;
+    background: white;
 }
 
 #posClearSearchBtn:hover {
@@ -1374,6 +1380,7 @@ body {
 .customer-search-wrapper {
     position: relative;
     margin-bottom: 10px;
+    z-index: 50; /* Ensure search wrapper is above cart panel */
 }
 
 #posCustomerSearch {
@@ -1634,6 +1641,73 @@ body {
     font-size: 10px;
 }
 
+/* Modern POS Components */
+.service-card-modern:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 15px rgba(0,0,0,0.08);
+    border-color: #667eea !important;
+}
+
+.service-card-modern:hover .hover-overlay {
+    opacity: 1 !important;
+}
+
+.service-card-modern:active {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.customer-intel-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 15px;
+    margin-top: 15px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.intel-notes-box {
+    background: #fffaf0;
+    border: 1px solid #fbd38d;
+    padding: 10px;
+    border-radius: 8px;
+    color: #744210;
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.cart-total-display {
+    background: #1a202c !important; /* Solid dark background for best contrast */
+    color: #ffffff !important;      /* Force bright white text */
+    padding: 20px !important;
+    border-radius: 12px !important;
+    margin: 20px 0 !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: 1px solid #2d3748;
+}
+
+.cart-total-display span {
+    color: #ffffff !important;      /* Ensure all spans inside are white */
+}
+
+#posCartTotal {
+    font-size: 28px !important;     /* Make the actual number larger */
+    font-weight: 800 !important;    /* Make it extra bold */
+    color: #48bb78 !important;      /* Use a bright green for the price to make it pop */
+}
+
+.checkout-btn {
+    height: 60px;
+    font-size: 18px !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-radius: 12px !important;
+}
+
 /* Responsive */
 .customer-intel-panel {
     background: #fff;
@@ -1676,6 +1750,56 @@ body {
 .intel-alert.new { background: #ebf4ff; color: #2b6cb0; border: 1px solid #bee3f8; }
 .intel-alert.warning { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
 
+/* Professional Dashboard Upgrade */
+.dashboard-kpi-grid .stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02), 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid #edf2f7;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-kpi-grid .stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+
+.dashboard-kpi-grid .stat-number {
+    font-size: 32px;
+    font-weight: 800;
+    margin-top: 10px;
+    display: flex;
+    align-items: baseline;
+}
+
+.dashboard-kpi-grid .stat-label {
+    font-size: 12px;
+    color: #a0aec0;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.chart-container, .list-panel {
+    background: white !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
+    border: 1px solid #edf2f7 !important;
+}
+
+.list-panel h3 {
+    padding: 20px 20px 15px 20px;
+    border-bottom: 1px solid #edf2f7;
+    margin: 0 !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #2d3748 !important;
+}
+
+/* Correct the existing search results styles */
 .support-results-dropdown {
     position: absolute;
     top: 100%;
@@ -1932,10 +2056,72 @@ body {
             margin-bottom: 10px;
             color: #666 !important;
         }
+    }
 
-    .print-date {
-        font-size: 12px;
-        color: #888 !important;
+/* Modern Threshold Modal - Refined Compact Version */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999 !important;
+    display: none; 
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: white;
+    width: 100%;
+    max-width: 500px !important; /* Compact width */
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #edf2f7;
+    background: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body {
+    padding: 25px !important; /* Balanced padding */
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    background: #f7fafc;
+    border-top: 1px solid #edf2f7;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+#thresholdInput {
+    padding: 12px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #2d3748;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    text-align: center;
+    width: 100%;
+    margin: 10px 0;
+}
+
+#thresholdInput:focus {
+    border-color: #667eea;
+    outline: none;
+}
     }
 
     /* Receipt styling */
@@ -2320,4 +2506,111 @@ body {
     font-size: 20px;
     font-weight: 700;
     color: #2d3748;
+}
+
+/* --- CRITICAL FIXES --- */
+
+/* Fix for POS Customer Search Dropdown Visibility */
+.customer-search-wrapper {
+    position: relative;
+    margin-bottom: 10px;
+    z-index: 100 !important; /* Force high z-index */
+}
+
+.search-dropdown {
+    z-index: 1000 !important;
+}
+
+/* Fix for POS Layout to allow dropdown overflow */
+.pos-right {
+    overflow-y: visible !important; /* Allow dropdown to spill out */
+    padding-right: 0;
+}
+
+/* Fix for POS Layout to allow scrolling */
+.pos-right {
+    overflow-y: auto !important; /* Restore scrolling for the whole panel */
+    padding-right: 5px;
+}
+
+/* Ensure cart list fits content */
+.cart-items-list {
+    overflow-y: visible; /* Let the parent handle the scroll */
+    min-height: 100px;
+    margin-bottom: 20px;
+}
+
+/* Modern Threshold Modal - Final Corrected Version */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999 !important;
+    display: none; 
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: white;
+    width: 100%;
+    max-width: 500px !important;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    animation: fadeIn 0.2s ease-out;
+    padding: 0;
+}
+
+.modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #edf2f7;
+    background: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+.modal-body {
+    padding: 25px !important;
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    background: #f7fafc;
+    border-top: 1px solid #edf2f7;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+#thresholdInput {
+    padding: 12px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #2d3748;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    text-align: center;
+    width: 100%;
+    margin: 10px 0;
+    transition: all 0.2s;
+}
+
+#thresholdInput:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+    outline: none;
 }

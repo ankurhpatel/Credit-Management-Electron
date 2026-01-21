@@ -151,7 +151,12 @@ class TransactionUI {
                     // It's a real bundle/combo
                     const first = items[0];
                     const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.amount_paid || 0), 0);
-                    const itemNames = items.map(i => i.service_name || 'Item').join(' + ');
+                    const itemNames = items.map(i => {
+                        if (i.service_name === 'IT App Services' && i.vendor_service_name) {
+                            return `IT App Services - ${i.vendor_service_name}`;
+                        }
+                        return i.service_name || 'Item';
+                    }).join(' + ');
                     displayList.push({
                         ...first,
                         isBundle: true,
@@ -298,35 +303,45 @@ class TransactionUI {
         const totalCost = filteredTransactions.reduce((sum, t) => sum + parseFloat(t.price_usd || 0), 0);
 
         container.innerHTML = `
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div class="stat-card" style="flex: 1; padding: 10px;">
-                    <small>Transactions</small><div>${filteredTransactions.length}</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #edf2f7; display: flex; align-items: center; gap: 12px;">
+                    <div style="font-size: 24px; background: #ebf4ff; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">📦</div>
+                    <div>
+                        <div style="font-size: 11px; color: #a0aec0; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Purchases</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #2d3748;">${filteredTransactions.length}</div>
+                    </div>
                 </div>
-                <div class="stat-card" style="flex: 1; padding: 10px;">
-                    <small>Total Spend</small><div>${TransactionUI.formatCurrency(totalCost)}</div>
+                <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #edf2f7; display: flex; align-items: center; gap: 12px;">
+                    <div style="font-size: 24px; background: #fff5f5; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">💸</div>
+                    <div>
+                        <div style="font-size: 11px; color: #a0aec0; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Total Spend</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #e53e3e;">${TransactionUI.formatCurrency(totalCost)}</div>
+                    </div>
                 </div>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" style="border: 1px solid #edf2f7; box-shadow: none;">
                 <table class="data-table" style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr style="text-align: left; border-bottom: 2px solid #edf2f7;">
-                            <th onclick="TransactionUI.handleSort('vendor', 'vendor')" style="cursor: pointer; padding: 10px;">Vendor ${TransactionUI.getSortIndicator('vendor', 'vendor')}</th>
-                            <th style="padding: 10px;">Service</th>
-                            <th onclick="TransactionUI.handleSort('vendor', 'date')" style="cursor: pointer; padding: 10px;">Date ${TransactionUI.getSortIndicator('vendor', 'date')}</th>
-                            <th style="padding: 10px; text-align: right;">Cost</th>
-                            <th style="padding: 10px; text-align: center;">Actions</th>
+                        <tr style="text-align: left; background: #f8fafc; border-bottom: 2px solid #edf2f7;">
+                            <th onclick="TransactionUI.handleSort('vendor', 'vendor')" style="cursor: pointer; padding: 15px; font-size: 11px;">VENDOR ${TransactionUI.getSortIndicator('vendor', 'vendor')}</th>
+                            <th style="padding: 15px; font-size: 11px;">SERVICE</th>
+                            <th onclick="TransactionUI.handleSort('vendor', 'date')" style="cursor: pointer; padding: 15px; font-size: 11px;">DATE ${TransactionUI.getSortIndicator('vendor', 'date')}</th>
+                            <th style="padding: 15px; text-align: right; font-size: 11px;">COST</th>
+                            <th style="padding: 15px; text-align: center; font-size: 11px;">ACTIONS</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${paginatedItems.map(trans => `
                             <tr style="border-bottom: 1px solid #f7fafc;">
-                                <td style="padding: 10px;"><strong>${trans.vendor_name || 'Vendor'}</strong></td>
-                                <td style="padding: 10px;">${trans.service_name || 'N/A'}</td>
-                                <td style="padding: 10px;">${TransactionUI.formatDate(trans.purchase_date)}</td>
-                                <td style="padding: 10px; text-align: right;">${TransactionUI.formatCurrency(trans.price_usd)}</td>
-                                <td style="padding: 10px; text-align: center;">
-                                    <button onclick="PrintManager.printVendorTransaction('${trans.transaction_id || trans.id}')" class="btn-icon">🖨️</button>
-                                    <button onclick="TransactionUI.deleteTransaction('vendor', '${trans.transaction_id || trans.id}')" class="btn-icon" style="color: #e53e3e;">🗑️</button>
+                                <td style="padding: 15px;"><strong>${trans.vendor_name || 'Vendor'}</strong></td>
+                                <td style="padding: 15px; color: #4a5568;">${trans.service_name || 'N/A'}</td>
+                                <td style="padding: 15px; color: #718096; font-size: 13px;">${TransactionUI.formatDate(trans.purchase_date)}</td>
+                                <td style="padding: 15px; text-align: right; font-weight: 700; color: #2d3748;">${TransactionUI.formatCurrency(trans.price_usd)}</td>
+                                <td style="padding: 15px; text-align: center;">
+                                    <div style="display: flex; gap: 5px; justify-content: center;">
+                                        <button onclick="PrintManager.printVendorTransaction('${trans.transaction_id || trans.id}')" class="btn-icon" style="background: #f7fafc; padding: 6px;" title="Print">🖨️</button>
+                                        <button onclick="TransactionUI.deleteTransaction('vendor', '${trans.transaction_id || trans.id}')" class="btn-icon" style="color: #e53e3e; background: #fff5f5; padding: 6px;" title="Delete">🗑️</button>
+                                    </div>
                                 </td>
                             </tr>
                         `).join('')}
@@ -351,36 +366,51 @@ class TransactionUI {
         const totalRev = filteredSales.reduce((sum, s) => sum + parseFloat(s.amount_paid || 0), 0);
 
         container.innerHTML = `
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div class="stat-card" style="flex: 1; padding: 10px;">
-                    <small>Sales</small><div>${filteredSales.length}</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #edf2f7; display: flex; align-items: center; gap: 12px;">
+                    <div style="font-size: 24px; background: #f0fff4; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">🏷️</div>
+                    <div>
+                        <div style="font-size: 11px; color: #a0aec0; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Orders</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #2d3748;">${filteredSales.length}</div>
+                    </div>
                 </div>
-                <div class="stat-card" style="flex: 1; padding: 10px;">
-                    <small>Total Revenue</small><div>${TransactionUI.formatCurrency(totalRev)}</div>
+                <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #edf2f7; display: flex; align-items: center; gap: 12px;">
+                    <div style="font-size: 24px; background: #ebf8ff; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">💰</div>
+                    <div>
+                        <div style="font-size: 11px; color: #a0aec0; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Total Revenue</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #3182ce;">${TransactionUI.formatCurrency(totalRev)}</div>
+                    </div>
                 </div>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" style="border: 1px solid #edf2f7; box-shadow: none;">
                 <table class="data-table" style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr style="text-align: left; border-bottom: 2px solid #edf2f7;">
-                            <th onclick="TransactionUI.handleSort('customer', 'customer')" style="cursor: pointer; padding: 10px;">Customer ${TransactionUI.getSortIndicator('customer', 'customer')}</th>
-                            <th style="padding: 10px;">Service</th>
-                            <th onclick="TransactionUI.handleSort('customer', 'date')" style="cursor: pointer; padding: 10px;">Date ${TransactionUI.getSortIndicator('customer', 'date')}</th>
-                            <th style="padding: 10px; text-align: right;">Amount</th>
-                            <th style="padding: 10px; text-align: center;">Actions</th>
+                        <tr style="text-align: left; background: #f8fafc; border-bottom: 2px solid #edf2f7;">
+                            <th onclick="TransactionUI.handleSort('customer', 'customer')" style="cursor: pointer; padding: 15px; font-size: 11px;">CUSTOMER ${TransactionUI.getSortIndicator('customer', 'customer')}</th>
+                            <th style="padding: 15px; font-size: 11px;">ITEM / SERVICE</th>
+                            <th onclick="TransactionUI.handleSort('customer', 'date')" style="cursor: pointer; padding: 15px; font-size: 11px;">DATE ${TransactionUI.getSortIndicator('customer', 'date')}</th>
+                            <th style="padding: 15px; text-align: right; font-size: 11px;">AMOUNT</th>
+                            <th style="padding: 15px; text-align: center; font-size: 11px;">ACTIONS</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${paginatedItems.map(sale => `
                             <tr style="border-bottom: 1px solid #f7fafc;">
-                                <td style="padding: 10px;"><strong>${sale.customerName || 'Unknown'}</strong></td>
-                                <td style="padding: 10px;"><small>${sale.service_name || 'N/A'}</small></td>
-                                <td style="padding: 10px;">${TransactionUI.formatDate(sale.start_date)}</td>
-                                <td style="padding: 10px; text-align: right;">${TransactionUI.formatCurrency(sale.amount_paid)}</td>
-                                <td style="padding: 10px; text-align: center;">
-                                    ${sale.order_status === 'Open' ? `<button onclick="TransactionUI.closeOrder('${sale.isBundle ? 'bundle' : 'single'}', '${sale.bundle_id || sale.id}')" class="btn-icon" style="color: #48bb78;">✅</button>` : ''}
-                                    <button onclick="${sale.isBundle ? `PrintManager.printBundleReceipt('${sale.bundle_id}')` : `PrintManager.printSingleTransaction('${sale.customer_id}', '${sale.id}')`}" class="btn-icon">🖨️</button>
-                                    <button onclick="TransactionUI.deleteTransaction('${sale.isBundle ? 'customer-bundle' : 'customer'}', '${sale.bundle_id || sale.id}')" class="btn-icon" style="color: #e53e3e;">🗑️</button>
+                                <td style="padding: 15px;">
+                                    <strong style="color: #2d3748;">${sale.customerName || 'Unknown'}</strong>
+                                    ${sale.isBundle ? '<br><span style="font-size: 10px; background: #ebf4ff; color: #3182ce; padding: 1px 6px; border-radius: 4px; font-weight: 700;">COMBO</span>' : ''}
+                                </td>
+                                <td style="padding: 15px; color: #4a5568; font-size: 13px;">
+                                    ${(sale.service_name === 'IT App Services' && sale.vendor_service_name) ? `IT App Services - ${sale.vendor_service_name}` : (sale.service_name || 'N/A')}
+                                </td>
+                                <td style="padding: 15px; color: #718096; font-size: 13px;">${TransactionUI.formatDate(sale.start_date)}</td>
+                                <td style="padding: 15px; text-align: right; font-weight: 700; color: #2d3748;">${TransactionUI.formatCurrency(sale.amount_paid)}</td>
+                                <td style="padding: 15px; text-align: center;">
+                                    <div style="display: flex; gap: 5px; justify-content: center;">
+                                        ${sale.order_status === 'Open' ? `<button onclick="TransactionUI.closeOrder('${sale.isBundle ? 'bundle' : 'single'}', '${sale.isBundle ? sale.bundle_id : sale.id}')" class="btn-icon" style="background: #f0fff4; color: #38a169; padding: 6px;" title="Fullfill/Close">✅</button>` : ''}
+                                        <button onclick="${sale.isBundle ? `PrintManager.printBundleReceipt('${sale.bundle_id}')` : `PrintManager.printSingleTransaction('${sale.customer_id}', '${sale.id}')`}" class="btn-icon" style="background: #f7fafc; padding: 6px;" title="Print Invoice">🖨️</button>
+                                        <button onclick="TransactionUI.deleteTransaction('${sale.isBundle ? 'customer-bundle' : 'customer'}', '${sale.isBundle ? sale.bundle_id : sale.id}')" class="btn-icon" style="color: #e53e3e; background: #fff5f5; padding: 6px;" title="Delete">🗑️</button>
+                                    </div>
                                 </td>
                             </tr>
                         `).join('')}
@@ -408,7 +438,12 @@ class TransactionUI {
     }
 
     static async deleteTransaction(type, id) {
-        if (!confirm(`Confirm delete ${type}?`)) return;
+        const msg = type === 'customer-bundle' 
+            ? '⚠️ Confirm delete ENTIRE BUNDLE? This will remove ALL items in this combo order.' 
+            : `Confirm delete ${type === 'vendor' ? 'purchase record' : 'transaction'}?`;
+            
+        if (!confirm(msg)) return;
+        
         const password = prompt('Password:');
         if (password !== '1234') return;
         try {
@@ -418,6 +453,7 @@ class TransactionUI {
                 await Promise.all([this.loadVendorTransactions(), this.loadCustomerSales()]);
                 if (window.POSUI) POSUI.loadCatalog();
                 DashboardUI.loadStats();
+                Alerts.showSuccess('Deleted', 'Record removed successfully');
             }
         } catch (error) { console.error(error); }
     }

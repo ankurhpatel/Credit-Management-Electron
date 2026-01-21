@@ -14,8 +14,9 @@ class DBSettingsUI {
 
             container.innerHTML = tables.map(table => `
                 <div class="db-table-item" onclick="DBSettingsUI.loadTableData('${table}')" 
-                     style="padding: 10px; cursor: pointer; border-radius: 6px; margin-bottom: 5px; background: #f7fafc; transition: all 0.2s;">
-                    📄 ${table}
+                     style="padding: 12px 15px; cursor: pointer; border-radius: 8px; margin-bottom: 8px; background: #fff; border: 1px solid #e2e8f0; transition: all 0.2s; display: flex; align-items: center; gap: 10px; font-weight: 500; color: #4a5568;">
+                    <span style="font-size: 18px;">📊</span>
+                    <span>${table}</span>
                 </div>
             `).join('');
         } catch (error) {
@@ -26,11 +27,19 @@ class DBSettingsUI {
     static async loadTableData(tableName) {
         // Highlight selected
         document.querySelectorAll('.db-table-item').forEach(el => {
-            el.style.background = '#f7fafc';
-            el.style.fontWeight = 'normal';
-            if (el.textContent.includes(tableName)) {
-                el.style.background = '#e2e8f0';
-                el.style.fontWeight = 'bold';
+            el.style.background = '#fff';
+            el.style.borderColor = '#e2e8f0';
+            el.style.color = '#4a5568';
+            el.style.transform = 'none';
+            el.style.boxShadow = 'none';
+            
+            // Check if this is the selected item by looking at the text content
+            if (el.querySelector('span:last-child').textContent === tableName) {
+                el.style.background = '#ebf4ff';
+                el.style.borderColor = '#667eea';
+                el.style.color = '#2b6cb0';
+                el.style.boxShadow = '0 2px 4px rgba(102, 126, 234, 0.1)';
+                el.style.fontWeight = '600';
             }
         });
 

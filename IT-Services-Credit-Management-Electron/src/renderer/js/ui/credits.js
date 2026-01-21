@@ -23,47 +23,67 @@ class CreditsUI {
                 return;
             }
 
-            container.innerHTML = balances.map(balance => {
-                const remainingCredits = balance.remaining_credits || balance.RemainingCredits || 0;
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+                    ${balances.map(balance => {
+                        const remainingCredits = balance.remaining_credits || balance.RemainingCredits || 0;
 
-                // Find the service to get custom threshold
-                const service = services.find(s =>
-                    s.vendor_id === balance.vendor_id &&
-                    s.service_name === (balance.service_name || balance.ServiceName)
-                );
-                const threshold = service?.low_stock_threshold !== undefined ? service.low_stock_threshold : 5;
+                        // Find the service to get custom threshold
+                        const service = services.find(s =>
+                            s.vendor_id === balance.vendor_id &&
+                            s.service_name === (balance.service_name || balance.ServiceName)
+                        );
+                        const threshold = service?.low_stock_threshold !== undefined ? service.low_stock_threshold : 5;
 
-                const alertClass = remainingCredits <= threshold ? 'low-credit' : '';
-                const statusIcon = remainingCredits <= 0 ? '🔴' : (remainingCredits <= threshold ? '⚠️' : '✅');
+                        const isOutOfStock = remainingCredits <= 0;
+                        const isLowStock = remainingCredits <= threshold && !isOutOfStock;
+                        
+                        const statusColor = isOutOfStock ? '#e53e3e' : (isLowStock ? '#ed8936' : '#48bb78');
+                        const statusBg = isOutOfStock ? '#fff5f5' : (isLowStock ? '#fffaf0' : '#f0fff4');
 
-                return `
-                    <div class="credit-balance-item ${alertClass}">
-                        <div class="balance-header">
-                            <div>
-                                <h4>${statusIcon} ${balance.vendor_name || balance.VendorName} - ${balance.service_name || balance.ServiceName}</h4>
-                                <small style="color: #718096;">Alert threshold: ${threshold} units</small>
+                        return `
+                            <div class="inventory-card" style="background: white; border-radius: 16px; border: 1px solid #edf2f7; box-shadow: 0 4px 6px rgba(0,0,0,0.02); overflow: hidden; display: flex; flex-direction: column;">
+                                <!-- Header Color Strip -->
+                                <div style="height: 6px; background: ${statusColor};"></div>
+                                
+                                <div style="padding: 20px; flex: 1;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                                        <div>
+                                            <h4 style="margin: 0; font-size: 16px; color: #2d3748; font-weight: 700;">${balance.service_name || balance.ServiceName}</h4>
+                                            <small style="color: #718096; font-weight: 600;">${balance.vendor_name || balance.VendorName}</small>
+                                        </div>
+                                        ${service ? `<button class="btn-icon" onclick="CreditsUI.showThresholdModal('${service.service_id}', ${remainingCredits})" style="background: #f7fafc; border-radius: 8px; padding: 6px;" title="Settings">⚙️</button>` : ''}
+                                    </div>
+
+                                    <div style="background: ${statusBg}; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
+                                        <div style="font-size: 11px; color: ${statusColor}; text-transform: uppercase; font-weight: 800; letter-spacing: 1px; margin-bottom: 5px;">
+                                            ${isOutOfStock ? '🚫 Out of Stock' : (isLowStock ? '⚠️ Low Stock' : '✅ In Stock')}
+                                        </div>
+                                        <div style="font-size: 32px; font-weight: 800; color: #2d3748;">${remainingCredits}</div>
+                                        <div style="font-size: 12px; color: #718096;">available units</div>
+                                    </div>
+
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; color: #4a5568;">
+                                        <div style="background: #f8fafc; padding: 10px; border-radius: 8px;">
+                                            <div style="color: #a0aec0; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">Purchased</div>
+                                            <strong>${balance.total_purchased || 0}</strong>
+                                        </div>
+                                        <div style="background: #f8fafc; padding: 10px; border-radius: 8px;">
+                                            <div style="color: #a0aec0; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">Used</div>
+                                            <strong>${balance.total_used || 0}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style="padding: 12px 20px; background: #fcfcfc; border-top: 1px solid #f7fafc; font-size: 11px; color: #a0aec0; display: flex; justify-content: space-between; align-items: center;">
+                                    <span>Refreshed: ${Formatters.formatDate(balance.last_updated)}</span>
+                                    <span style="background: white; padding: 2px 6px; border: 1px solid #edf2f7; border-radius: 4px;">Limit: ${threshold}</span>
+                                </div>
                             </div>
-                            <div class="balance-header-actions">
-                                ${remainingCredits <= threshold && remainingCredits > 0 ? '<div class="low-credit-badge">⚠️ Low Stock</div>' : ''}
-                                ${remainingCredits <= 0 ? '<div class="out-of-stock-badge">🔴 Out of Stock</div>' : ''}
-                                ${service ? `<button class="btn-icon" onclick="CreditsUI.showThresholdModal('${service.service_id}', '${(balance.service_name || balance.ServiceName).replace(/'/g, "\\'")}', ${remainingCredits}, ${threshold})" title="Configure alert threshold">⚙️</button>` : ''}
-                            </div>
-                        </div>
-                        <div class="balance-details">
-                            <strong>💳 Remaining Credits:</strong> ${Formatters.formatNumber(remainingCredits)}<br>
-                            <strong>📊 Total Purchased:</strong> ${Formatters.formatNumber(balance.total_purchased || balance.TotalPurchased || 0)}<br>
-                            <strong>📈 Total Used:</strong> ${Formatters.formatNumber(balance.total_used || balance.TotalUsed || 0)}<br>
-                            <strong>📅 Last Updated:</strong> ${Formatters.formatDate(balance.last_updated || balance.LastUpdated)}
-                        </div>
-                        ${remainingCredits <= threshold && remainingCredits > 0 ?
-                        `<div class="credit-warning">⚠️ <strong>Low Stock Alert:</strong> Stock is at or below your threshold of ${threshold} units. Consider purchasing more.</div>` : ''
-                    }
-                        ${remainingCredits <= 0 ?
-                        '<div class="credit-warning" style="background: #fff5f5; border-color: #e53e3e; color: #c53030;">🔴 <strong>Out of Stock:</strong> No credits remaining. Purchase immediately!</div>' : ''
-                    }
-                    </div>
-                `;
-            }).join('');
+                        `;
+                    }).join('')}
+                </div>
+            `;
         });
     }
 
@@ -76,22 +96,44 @@ class CreditsUI {
         }
     }
 
-    static showThresholdModal(serviceId, serviceName, currentStock, currentThreshold) {
-        const modal = document.getElementById('thresholdModal');
-        if (!modal) {
-            console.error('Threshold modal not found');
+    static showThresholdModal(serviceId, currentStock) {
+        console.log('⚙️ Opening Threshold Modal:', { serviceId, currentStock });
+        
+        // Look up service details from Store
+        const services = Store.getVendorServices();
+        const service = services.find(s => s.service_id === serviceId);
+        
+        if (!service) {
+            console.error('Service not found:', serviceId);
             return;
         }
 
-        document.getElementById('thresholdServiceName').textContent = serviceName;
-        document.getElementById('thresholdCurrentStock').textContent = currentStock;
-        document.getElementById('thresholdInput').value = currentThreshold;
-        document.getElementById('thresholdServiceId').value = serviceId;
+        const serviceName = service.service_name;
+        const currentThreshold = service.low_stock_threshold !== undefined ? service.low_stock_threshold : 5;
+
+        const modal = document.getElementById('thresholdModal');
+        if (!modal) {
+            console.error('Threshold modal not found in DOM');
+            return;
+        }
+
+        const nameEl = document.getElementById('thresholdServiceName');
+        if (nameEl) nameEl.textContent = serviceName;
+        
+        const stockEl = document.getElementById('thresholdCurrentStock');
+        if (stockEl) stockEl.textContent = currentStock;
+        
+        const inputEl = document.getElementById('thresholdInput');
+        if (inputEl) inputEl.value = currentThreshold;
+        
+        const idEl = document.getElementById('thresholdServiceId');
+        if (idEl) idEl.value = serviceId;
 
         // Show preview
         this.updateThresholdPreview(currentStock, currentThreshold);
 
-        modal.style.display = 'flex';
+        modal.style.setProperty('display', 'flex', 'important');
+        console.log('✅ Modal display set to flex');
     }
 
     static updateThresholdPreview(stock, threshold) {

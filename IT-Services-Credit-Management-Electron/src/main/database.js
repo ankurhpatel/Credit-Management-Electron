@@ -8,6 +8,7 @@ class DatabaseManager {
         this.SQL = null;
         this.dbPath = path.join(__dirname, '../../database/subscription-data.db');
         this.inTransaction = false;
+        this.saveTimeout = null;
     }
 
     async initialize() {
@@ -38,7 +39,8 @@ class DatabaseManager {
             
             // await this.clearAllData(); 
 
-            this.saveToFile();
+            // Initial save to ensure file exists, but instant
+            this.saveToFile(true); 
             return this.db;
         } catch (error) {
             console.error('❌ Database initialization failed:', error);
@@ -190,6 +192,17 @@ class DatabaseManager {
                     ('company_logo', ''),
                     ('currency_symbol', '$')
                 `);
+
+                // Ensure Internal Store Vendor exists for Misc items
+                const internalVendor = this.db.exec("SELECT vendor_id FROM vendors WHERE vendor_id = 'INTERNAL_STORE'");
+                if (internalVendor.length === 0) {
+                    this.db.exec(`
+                        INSERT INTO vendors (vendor_id, name, description, is_active, created_date)
+                        VALUES ('INTERNAL_STORE', 'Store Operations', 'Internal vendor for custom items and adjustments', 1, datetime('now'))
+                    `);
+                    console.log('✅ Created Internal Store vendor');
+                }
+
                 console.log('✅ Database tables created and defaults set');
             } else {
                 console.log('✅ Database tables already exist');
@@ -434,14 +447,30 @@ class DatabaseManager {
         };
     }
 
-    saveToFile() {
+    saveToFile(instant = false) {
         try {
-            const data = this.db.export();
-            const buffer = Buffer.from(data);
-            fs.writeFileSync(this.dbPath, buffer);
+            const save = () => {
+                try {
+                    if (this.db) {
+                        const data = this.db.export();
+                        const buffer = Buffer.from(data);
+                        fs.writeFileSync(this.dbPath, buffer);
+                        // console.log('💾 Database saved to disk');
+                    }
+                } catch (error) {
+                    console.error('❌ Error saving database:', error);
+                }
+            };
+
+            if (instant) {
+                if (this.saveTimeout) clearTimeout(this.saveTimeout);
+                save();
+            } else {
+                if (this.saveTimeout) clearTimeout(this.saveTimeout);
+                this.saveTimeout = setTimeout(save, 2000); // Debounce for 2 seconds
+            }
         } catch (error) {
-            console.error('❌ Error saving database:', error);
-            // Don't throw here as it would break the application
+            console.error('❌ Error initiating save:', error);
         }
     }
 
@@ -455,7 +484,7 @@ class DatabaseManager {
 
     close() {
         if (this.db) {
-            this.saveToFile();
+            this.saveToFile(true); // Force instant save
             this.db.close();
             this.db = null;
             console.log('🗄️  Database connection closed');

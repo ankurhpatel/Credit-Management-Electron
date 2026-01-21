@@ -78,8 +78,8 @@ class DashboardUI {
         const elMarg = document.getElementById('kpiMargin');
         const elOrd = document.getElementById('kpiOrders');
 
-        if (elRev) elRev.textContent = `$${parseFloat(kpis.revenue || 0).toFixed(2)}`;
-        if (elGP) elGP.textContent = `$${parseFloat(kpis.grossProfit || 0).toFixed(2)}`;
+        if (elRev) elRev.innerHTML = `<span style="font-size: 14px; opacity: 0.7; margin-right: 5px;">$</span>${parseFloat(kpis.revenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        if (elGP) elGP.innerHTML = `<span style="font-size: 14px; opacity: 0.7; margin-right: 5px;">$</span>${parseFloat(kpis.grossProfit || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
         if (elMarg) elMarg.textContent = `${parseFloat(kpis.margin || 0).toFixed(1)}%`;
         if (elOrd) elOrd.textContent = kpis.orders || 0;
     }
@@ -89,20 +89,25 @@ class DashboardUI {
         if (!container) return;
 
         if (!items || items.length === 0) {
-            container.innerHTML = '<tr><td colspan="3" style="padding: 15px; text-align: center; color: #a0aec0; font-style: italic;">No sales data for this period.</td></tr>';
+            container.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #a0aec0; font-style: italic;">No sales data found.</td></tr>';
             return;
         }
 
-        container.innerHTML = items.map(item => `
-            <tr style="border-bottom: 1px solid #f7fafc;">
-                <td style="padding: 12px 8px; color: #2d3748; font-weight: 500;">
-                    ${item.service_name} <br>
-                    <span style="font-size: 11px; color: #718096; font-weight: normal;">${item.type}</span>
-                </td>
-                <td style="padding: 12px 8px; text-align: right; color: #4a5568;">${item.units_sold}</td>
-                <td style="padding: 12px 8px; text-align: right; color: #38a169; font-weight: 600;">$${parseFloat(item.profit).toFixed(2)}</td>
-            </tr>
-        `).join('');
+        container.innerHTML = items.map((item, index) => {
+            const medal = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : ''));
+            return `
+                <tr style="border-bottom: 1px solid #f7fafc; transition: background 0.2s;">
+                    <td style="padding: 15px 8px; color: #2d3748; font-weight: 600;">
+                        ${medal} ${item.service_name} <br>
+                        <span style="font-size: 10px; color: #a0aec0; font-weight: normal; text-transform: uppercase; letter-spacing: 0.5px;">${item.type}</span>
+                    </td>
+                    <td style="padding: 15px 8px; text-align: right; color: #4a5568;">
+                        <span style="background: #edf2f7; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 700;">${item.units_sold} sold</span>
+                    </td>
+                    <td style="padding: 15px 8px; text-align: right; color: #38a169; font-weight: 800; font-size: 15px;">$${parseFloat(item.profit).toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     static renderLowStock(items) {
@@ -110,7 +115,12 @@ class DashboardUI {
         if (!container) return;
 
         if (!items || items.length === 0) {
-            container.innerHTML = '<div style="font-size: 13px; color: #38a169; padding: 10px; background: #f0fff4; border-radius: 6px;">✅ All stock levels are above their alert thresholds.</div>';
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; padding: 15px; background: #f0fff4; border-radius: 10px; color: #2f855a; font-weight: 600; font-size: 13px; border: 1px solid #c6f6d5;">
+                    <span style="font-size: 20px;">✅</span>
+                    <span>All stock levels healthy</span>
+                </div>
+            `;
             return;
         }
 
@@ -118,18 +128,24 @@ class DashboardUI {
             const stock = item.remaining_credits || 0;
             const threshold = item.threshold || 5;
             const isOutOfStock = stock === 0;
-            const icon = isOutOfStock ? '🔴' : '⚠️';
+            const icon = isOutOfStock ? '🚫' : '⚠️';
             const bgColor = isOutOfStock ? '#fff5f5' : '#fffaf0';
-            const textColor = isOutOfStock ? '#c53030' : '#c05621';
-            const badgeColor = isOutOfStock ? '#e53e3e' : '#ed8936';
+            const textColor = isOutOfStock ? '#c53030' : '#975a16';
+            const progressColor = isOutOfStock ? '#e53e3e' : '#ed8936';
+            const percentage = Math.min((stock / (threshold * 2)) * 100, 100);
 
             return `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #edf2f7; background: ${bgColor}; margin-bottom: 4px; border-radius: 6px;">
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600; color: #2d3748;">${icon} ${item.vendor_name} - ${item.service_name}</div>
-                        <div style="font-size: 11px; color: #718096; margin-top: 2px;">Alert threshold: ${threshold} units</div>
+                <div style="padding: 12px; background: ${bgColor}; border: 1px solid ${progressColor}22; border-radius: 10px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                        <div>
+                            <div style="font-size: 13px; font-weight: 700; color: #2d3748;">${item.service_name}</div>
+                            <div style="font-size: 11px; color: #718096;">${item.vendor_name}</div>
+                        </div>
+                        <span style="font-size: 14px; font-weight: 800; color: ${textColor};">${stock}</span>
                     </div>
-                    <span style="font-size: 12px; font-weight: 700; color: white; background: ${badgeColor}; padding: 4px 10px; border-radius: 12px; white-space: nowrap;">${stock} ${isOutOfStock ? '' : '/ ' + threshold}</span>
+                    <div style="height: 4px; background: rgba(0,0,0,0.05); border-radius: 2px; overflow: hidden;">
+                        <div style="width: ${percentage}%; height: 100%; background: ${progressColor};"></div>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -269,7 +285,12 @@ class DashboardUI {
         if (!container) return;
 
         if (subscriptions.length === 0) {
-            container.innerHTML = '<div style="font-size: 13px; color: #38a169; padding: 10px; background: #f0fff4; border-radius: 6px;">✅ No upcoming expirations.</div>';
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; padding: 15px; background: #f0fff4; border-radius: 10px; color: #2f855a; font-weight: 600; font-size: 13px; border: 1px solid #c6f6d5;">
+                    <span style="font-size: 20px;">🎉</span>
+                    <span>No expirations in next 30 days</span>
+                </div>
+            `;
             return;
         }
 
@@ -282,19 +303,20 @@ class DashboardUI {
             const daysUntilExpiry = Math.ceil((expireDate - today) / (1000 * 60 * 60 * 24));
             const isCritical = daysUntilExpiry <= 7;
             const color = isCritical ? '#e53e3e' : '#ed8936';
+            const bgColor = isCritical ? '#fff5f5' : '#fffaf0';
             const customerName = sub.customer_name || sub.CustomerName || 'Unknown';
 
             return `
-                <div style="padding: 8px 0; border-bottom: 1px solid #edf2f7; display: flex; justify-content: space-between; align-items: center;">
+                <div style="padding: 12px; background: ${bgColor}; border: 1px solid ${color}22; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <div style="font-size: 13px; color: #2d3748; font-weight: 500;">${customerName}</div>
-                        <div style="font-size: 11px; color: #718096;">${sub.service_name || sub.ServiceName}</div>
+                        <div style="font-size: 13px; color: #2d3748; font-weight: 700;">${customerName}</div>
+                        <div style="font-size: 11px; color: #718096; margin-top: 2px;">${sub.service_name}</div>
                     </div>
                     <div style="text-align: right;">
-                        <span style="font-size: 12px; font-weight: 700; color: ${color};">${daysUntilExpiry} days</span>
-                        <div style="display: flex; gap: 5px; justify-content: flex-end; margin-top: 2px;">
+                        <div style="font-size: 12px; font-weight: 800; color: ${color};">${daysUntilExpiry} days left</div>
+                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 5px;">
                             <button onclick="DashboardUI.sendWhatsApp('${sub.customer_phone}', '${customerName}', '${sub.service_name}')" 
-                                    style="border: none; background: none; cursor: pointer; padding: 0; font-size: 14px;" title="WhatsApp">🟢</button>
+                                    class="btn-small" style="background: #25D366; color: white; padding: 2px 8px; font-size: 10px;" title="Send WhatsApp">WhatsApp</button>
                         </div>
                     </div>
                 </div>
@@ -302,7 +324,7 @@ class DashboardUI {
         }).join('');
         
         if (subscriptions.length > 5) {
-            container.innerHTML += `<div style="text-align: center; padding-top: 5px; font-size: 12px; color: #667eea;">+${subscriptions.length - 5} more</div>`;
+            container.innerHTML += `<div onclick="showTab('customers')" style="text-align: center; padding-top: 10px; font-size: 12px; color: #667eea; cursor: pointer; font-weight: 600;">View ${subscriptions.length - 5} more expirations →</div>`;
         }
     }
 

@@ -125,7 +125,7 @@ class Forms {
 
             const subscriptionData = {
                 customerID: formData.get('customerID'),
-                serviceName: formData.get('serviceName') || 'IT App Services',
+                serviceName: formData.get('vendorServiceName') ? `IT App Services - ${formData.get('vendorServiceName')}` : (formData.get('serviceName') || 'IT App Services'),
                 startDate: formData.get('startDate'),
                 creditsSelected: parseInt(formData.get('creditsSelected')),
                 amountPaid: parseFloat(formData.get('amountPaid')),

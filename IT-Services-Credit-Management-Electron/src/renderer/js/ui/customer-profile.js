@@ -250,7 +250,10 @@ class CustomerProfileUI {
                         </div>
                     </div>
                     <div style="font-size: 13px; color: #4a5568; margin-bottom: 10px;">
-                        ${receipt.items.map(item => `• ${item.vendor_service_name || item.service_name}`).join('<br>')}
+                        ${receipt.items.map(item => `
+                            • ${item.vendor_service_name || item.service_name} 
+                            ${item.mac_address ? `<small style="color: #667eea; background: #f0f4ff; padding: 1px 5px; border-radius: 4px; margin-left: 5px;">${item.mac_address}</small>` : ''}
+                        `).join('<br>')}
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button onclick="${printAction}" class="btn-small btn-secondary" style="font-size: 11px; padding: 4px 10px;">🖨️ Print</button>
@@ -281,7 +284,8 @@ class CustomerProfileUI {
                         <div style="font-size: 11px; color: #718096;">
                             Started: ${this.formatDate(sub.start_date)}<br>
                             Renewed: ${sub.renewal_count - 1} time${sub.renewal_count - 1 !== 1 ? 's' : ''}<br>
-                            ${sub.classification ? `Location: ${sub.classification}` : ''}
+                            ${sub.classification ? `📍 Location: ${sub.classification}<br>` : ''}
+                            ${sub.mac_address ? `🖥️ Device/MAC: <span style="color: #667eea; font-weight: 600;">${sub.mac_address}</span>` : ''}
                         </div>
                     </div>
                 `).join('')}

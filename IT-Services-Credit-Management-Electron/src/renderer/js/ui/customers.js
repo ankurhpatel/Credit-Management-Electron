@@ -57,40 +57,51 @@ class CustomersUI {
             return;
         }
 
-        container.innerHTML = customers.map(customer => {
-            const status = (customer.status || customer.Status || 'active').toLowerCase();
-            const isActive = status === 'active';
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+                ${customers.map(customer => {
+                    const status = (customer.status || customer.Status || 'active').toLowerCase();
+                    const isActive = status === 'active';
+                    const statusColor = isActive ? '#38a169' : '#e53e3e';
+                    const statusBg = isActive ? '#f0fff4' : '#fff5f5';
 
-            return `
-                <div class="customer-card ${!isActive ? 'inactive' : ''}" data-customer-id="${customer.id || customer.CustomerID}">
-                    <div class="customer-header">
-                        <h4 class="customer-name" style="cursor: pointer; color: #667eea;" onclick="CustomerProfileUI.loadProfile('${customer.id || customer.CustomerID}')" title="Click to view full profile">${customer.name || customer.Name}</h4>
-                        <div class="customer-status ${status}">
-                            ${status.toUpperCase()}
+                    return `
+                        <div class="customer-card" style="background: white; border-radius: 16px; border: 1px solid #edf2f7; box-shadow: 0 4px 6px rgba(0,0,0,0.02); overflow: hidden; display: flex; flex-direction: column; transition: all 0.3s ease;">
+                            <div style="padding: 20px; flex: 1;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                                    <div>
+                                        <h4 class="customer-name" style="margin: 0; font-size: 18px; color: #2d3748; font-weight: 700; cursor: pointer; transition: color 0.2s;" onclick="CustomerProfileUI.loadProfile('${customer.id || customer.CustomerID}')">${customer.name || customer.Name}</h4>
+                                        <div style="display: inline-block; background: ${statusBg}; color: ${statusColor}; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px;">${status}</div>
+                                    </div>
+                                    <div style="font-size: 24px; background: #f7fafc; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">👤</div>
+                                </div>
+                                
+                                <div style="font-size: 13px; color: #4a5568; line-height: 1.6;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                        <span style="color: #a0aec0; width: 15px;">📧</span> <span>${customer.email || customer.Email}</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                        <span style="color: #a0aec0; width: 15px;">📱</span> <span>${customer.phone || customer.Phone || 'Not provided'}</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                        <span style="color: #a0aec0; width: 15px;">📅</span> <span style="font-size: 11px; color: #718096;">Added ${this.formatDate(customer.created_date || customer.CreatedDate)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="padding: 15px 20px; background: #fcfcfc; border-top: 1px solid #f7fafc; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <button onclick="CustomerProfileUI.loadProfile('${customer.id || customer.CustomerID}')" class="btn-small" style="background: #ebf8ff; color: #3182ce; font-weight: 700;">👤 Profile</button>
+                                <button onclick="editCustomerById('${customer.id || customer.CustomerID}')" class="btn-small" style="background: #f7fafc; color: #4a5568; font-weight: 700;">✏️ Edit</button>
+                                ${isActive ?
+                                    `<button onclick="addSubscriptionForCustomer('${customer.id || customer.CustomerID}')" class="btn-small" style="background: #f0fff4; color: #38a169; font-weight: 700; grid-column: span 2;">📝 New Sale (POS)</button>`
+                                    : `<button onclick="reactivateCustomer('${customer.id || customer.CustomerID}')" class="btn-small" style="background: #f0fff4; color: #38a169; font-weight: 700; grid-column: span 2;">✅ Activate</button>`
+                                }
+                            </div>
                         </div>
-                    </div>
-                    <div class="customer-details">
-                        <div class="customer-info">
-                            <strong>🆔 ID:</strong> ${customer.id || customer.CustomerID}<br>
-                            <strong>📧 Email:</strong> ${customer.email || customer.Email}<br>
-                            <strong>📱 Phone:</strong> ${customer.phone || customer.Phone || 'Not provided'}<br>
-                            <strong>📅 Added:</strong> ${this.formatDate(customer.created_date || customer.CreatedDate)}
-                            ${(customer.address || customer.Address) ?
-                    `<br><strong>🏠 Address:</strong> ${customer.address || customer.Address}` : ''
-                }
-                        </div>
-                    </div>
-                    <div class="customer-actions">
-                        <button onclick="CustomerProfileUI.loadProfile('${customer.id || customer.CustomerID}')" class="btn-small btn-info" style="font-weight: 600;">👤 View Profile</button>
-                        <button onclick="editCustomerById('${customer.id || customer.CustomerID}')" class="btn-small btn-primary">✏️ Edit</button>
-                        ${isActive ?
-                    `<button onclick="addSubscriptionForCustomer('${customer.id || customer.CustomerID}')" class="btn-small btn-success">📝 Add Subscription</button>`
-                    : `<button onclick="reactivateCustomer('${customer.id || customer.CustomerID}')" class="btn-small btn-success">✅ Activate</button>`
-                }
-                    </div>
-                </div>
-            `;
-        }).join('');
+                    `;
+                }).join('')}
+            </div>
+        `;
     }
 
     static formatDate(date) {

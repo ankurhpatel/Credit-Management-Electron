@@ -49,13 +49,14 @@
                 <!-- Left Side: Catalog -->
                 <div class="pos-left">
                     <div class="pos-section-header">
-                        <h3>📦 Service Catalog</h3>
-                        <div style="position: relative; display: flex; align-items: center;">
-                            <input type="text" id="posServiceSearch" placeholder="🔍 Filter by name, type, vendor, or price..."
-                                   oninput="POSUI.filterServices()" style="width: 100%; padding-right: 35px;">
+                        <h3 style="margin-right: 20px; white-space: nowrap;">📦 Catalog</h3>
+                        <div style="position: relative; flex: 1; max-width: 500px; margin-right: 10px;">
+                            <input type="text" id="posServiceSearch" placeholder="🔍 Search items by name, type, or vendor..."
+                                   oninput="POSUI.filterServices()" 
+                                   style="width: 100%; padding: 12px 45px 12px 15px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                             <button onclick="document.getElementById('posServiceSearch').value=''; POSUI.filterServices();"
                                     id="posClearSearchBtn"
-                                    style="position: absolute; right: 8px; background: none; border: none; color: #a0aec0; cursor: pointer; font-size: 18px; padding: 4px 8px; display: none;"
+                                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: #edf2f7; border: none; color: #718096; cursor: pointer; font-size: 16px; width: 28px; height: 28px; border-radius: 50%; display: none; align-items: center; justify-content: center; transition: all 0.2s;"
                                     title="Clear search">✕</button>
                         </div>
                     </div>
@@ -143,9 +144,14 @@
                                 <input type="text" id="posOrderNotes" placeholder="Optional notes for this order">
                             </div>
                             
-                            <div class="price-display cart-total-display">
-                                <span>Grand Total:</span>
-                                <span id="posCartTotal">$0.00</span>
+                            <div class="price-display cart-total-display" style="background: #1a202c; color: white; padding: 20px; border-radius: 12px; margin: 20px 0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                <span style="font-size: 18px;">Grand Total:</span>
+                                <div style="display: flex; align-items: center;">
+                                    <span style="font-size: 24px; font-weight: 800; color: #48bb78; margin-right: 5px;">$</span>
+                                    <input type="number" id="posCartTotal" value="0.00" step="0.01" 
+                                           onchange="POSUI.updateCartTotal(this.value)"
+                                           style="background: transparent; border: none; border-bottom: 2px solid #48bb78; color: #48bb78; font-size: 28px; font-weight: 800; width: 140px; text-align: right; outline: none;">
+                                </div>
                             </div>
 
                             <button id="posCheckoutBtn" class="btn-primary checkout-btn" onclick="POSUI.processSale()">
@@ -191,6 +197,53 @@
                 <div class="modal-footer">
                     <button onclick="CreditsUI.closeThresholdModal()" class="btn-secondary">Cancel</button>
                     <button onclick="CreditsUI.saveThreshold()" class="btn-primary">💾 Save Threshold</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Item / Misc Modal -->
+        <div id="customItemModal" class="modal-backdrop" style="display: none;">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>✨ Add Custom / Misc Item</h3>
+                    <button onclick="POSUI.closeCustomItemModal()" class="btn-icon">✕</button>
+                </div>
+                <div class="modal-body">
+                    <form onsubmit="POSUI.addCustomItemToCart(event)">
+                        <div class="form-group">
+                            <label>📝 Item Description / Name:</label>
+                            <input type="text" id="customItemName" required placeholder="e.g. Service Fee, Refund, Old Cable..." 
+                                   style="font-size: 16px; padding: 10px;">
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label>💰 Price ($):</label>
+                                <input type="number" id="customItemPrice" step="0.01" required placeholder="0.00"
+                                       style="font-size: 16px; padding: 10px;">
+                                <small>Use negative (-) for refunds</small>
+                            </div>
+                            <div class="form-group">
+                                <label>📊 Quantity / Months:</label>
+                                <input type="number" id="customItemQty" value="1" min="1" required
+                                       style="font-size: 16px; padding: 10px;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>📦 Item Type:</label>
+                            <select id="customItemType" class="form-select" style="padding: 10px;">
+                                <option value="subscription">📅 Service / Labor</option>
+                                <option value="hardware">🔌 Hardware / Physical</option>
+                                <option value="fee">💰 Fee / Adjustment</option>
+                            </select>
+                        </div>
+
+                        <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                            <button type="button" onclick="POSUI.closeCustomItemModal()" class="btn-secondary">Cancel</button>
+                            <button type="submit" class="btn-primary">➕ Add to Order</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -924,6 +977,14 @@
 
             <!-- Database Settings -->
             <div id="db-settings" class="settings-section" style="display: none;">
+                
+                <!-- Danger Zone -->
+                <div style="margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; background: #fff5f5; padding: 15px; border-radius: 8px; border: 1px solid #feb2b2;">
+                    <h3 style="margin-top: 0; color: #c53030;">⚠️ Danger Zone</h3>
+                    <p style="color: #742a2a; margin-bottom: 15px;">Resetting the database will permanently delete all customers, transactions, inventory, and history. This cannot be undone.</p>
+                    <button onclick="SettingsUI.resetDatabase()" class="btn-danger">🗑️ Reset Database (Clear All Data)</button>
+                </div>
+
                 <div style="display: flex; gap: 20px; height: 600px;">
                     <!-- Sidebar: Table List -->
                     <div style="width: 250px; border-right: 1px solid #e2e8f0; padding-right: 20px; overflow-y: auto;">

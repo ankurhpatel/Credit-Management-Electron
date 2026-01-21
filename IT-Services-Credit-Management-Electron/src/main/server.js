@@ -9,7 +9,18 @@ class EmbeddedServer {
         this.app = express();
         this.server = null;
         this.port = 3001;
-        this.db = database.getDb();
+        this.databaseManager = database;
+        this.db = database.getDb(); // This returns the DatabaseManager instance itself based on database.js:630, wait no.
+        // database.js:630 getDb() { return this; } returns the manager.
+        // But main.js:115 passes `database` which is `new DatabaseManager()`.
+        // So `this.db = database.getDb()` sets `this.db` to the manager instance?
+        // Let's re-read database.js carefully.
+        // L630: getDb() { return this; }
+        // L11: this.db = null; (This is the sql.js database)
+        // Wait, if getDb returns `this` (the manager), then `this.db` in server.js becomes the manager.
+        // But in server.js `setupDatabaseRoutes`: `this.db.prepare(...)`. The manager has a `prepare` method (L237).
+        // So `this.db` in server.js IS the manager wrapper.
+        // So I can just call `this.db.clearAllData()`.
 
         this.setupMiddleware();
         this.setupRoutes();
@@ -85,21 +96,28 @@ class EmbeddedServer {
 
         this.app.post('/api/database/execute', (req, res) => {
             try {
-                const { sql } = req.body;
-                if (!sql) return res.status(400).json({ error: 'SQL query required' });
-
-                // Simple check to prevent completely dropping the database logic, 
-                // though user asked for "edit it also" so we allow updates/deletes.
-                // We should probably allow SELECTs to return data and others to return change counts.
-
-                if (sql.trim().toLowerCase().startsWith('select')) {
-                    const data = this.db.prepare(sql).all();
-                    res.json({ type: 'SELECT', data });
-                } else {
-                    const info = this.db.prepare(sql).run();
-                    res.json({ type: 'EXECUTE', changes: info.changes });
-                }
+                // SECURITY PATCH: Arbitrary SQL execution disabled.
+                res.status(403).json({ error: 'Direct SQL execution is disabled for security reasons.' });
             } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        this.app.post('/api/database/reset', async (req, res) => {
+            try {
+                const password = req.headers['password'];
+                if (password !== '1234') {
+                    return res.status(401).json({ error: 'Unauthorized: Incorrect password' });
+                }
+
+                console.log('⚠️ RESETTING DATABASE...');
+                await this.db.clearAllData();
+                await this.db.ensureTablesExist();
+                await this.db.ensureSchemaUpdates();
+                
+                res.json({ success: true, message: 'Database reset successfully' });
+            } catch (error) {
+                console.error('Reset Error:', error);
                 res.status(500).json({ error: error.message });
             }
         });
@@ -476,6 +494,21 @@ class EmbeddedServer {
             }
         });
 
+        this.app.delete('/api/vendor-services/:serviceId', (req, res) => {
+            try {
+                const { serviceId } = req.params;
+                const result = this.db.prepare('DELETE FROM vendor_services WHERE service_id = ?').run([serviceId]);
+                
+                if (result.changes === 0) {
+                    return res.status(404).json({ error: 'Service not found' });
+                }
+                
+                res.json({ success: true });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         this.app.put('/api/vendor-services/:serviceId/threshold', (req, res) => {
             try {
                 const { threshold } = req.body;
@@ -597,15 +630,21 @@ class EmbeddedServer {
 
         this.app.delete('/api/subscriptions/:id', (req, res) => {
             try {
+                let changes = 0;
                 const transaction = this.db.transaction(() => {
                     const sub = this.db.prepare('SELECT * FROM subscriptions WHERE id = ?').get([req.params.id]);
                     if (sub && sub.vendor_id && sub.credits_used > 0) {
                         this.db.prepare('UPDATE credit_balances SET remaining_credits = remaining_credits + ?, total_used = total_used - ? WHERE vendor_id = ? AND service_name = ?')
                             .run([sub.credits_used, sub.credits_used, sub.vendor_id, sub.vendor_service_name]);
                     }
-                    this.db.prepare('DELETE FROM subscriptions WHERE id = ?').run([req.params.id]);
+                    const info = this.db.prepare('DELETE FROM subscriptions WHERE id = ?').run([req.params.id]);
+                    changes = info.changes;
                 });
                 transaction();
+                
+                if (changes === 0) {
+                    return res.status(404).json({ success: false, message: 'Subscription not found' });
+                }
                 res.json({ success: true, message: 'Deleted' });
             } catch (error) {
                 res.status(500).json({ error: error.message });
@@ -638,17 +677,28 @@ class EmbeddedServer {
 
         this.app.delete('/api/subscriptions/bundle/:bundleId', (req, res) => {
             try {
+                const bundleId = req.params.bundleId;
+                if (!bundleId || bundleId === 'null' || bundleId === 'undefined') {
+                    return res.status(400).json({ error: 'Invalid Bundle ID' });
+                }
+
+                let changes = 0;
                 const transaction = this.db.transaction(() => {
-                    const items = this.db.prepare('SELECT * FROM subscriptions WHERE bundle_id = ?').all([req.params.bundleId]);
+                    const items = this.db.prepare('SELECT * FROM subscriptions WHERE bundle_id = ?').all([bundleId]);
                     for (const item of items) {
                         if (item.vendor_id && item.credits_used > 0) {
                             this.db.prepare('UPDATE credit_balances SET remaining_credits = remaining_credits + ?, total_used = total_used - ? WHERE vendor_id = ? AND service_name = ?')
                                 .run([item.credits_used, item.credits_used, item.vendor_id, item.vendor_service_name]);
                         }
                     }
-                    this.db.prepare('DELETE FROM subscriptions WHERE bundle_id = ?').run([req.params.bundleId]);
+                    const info = this.db.prepare('DELETE FROM subscriptions WHERE bundle_id = ?').run([bundleId]);
+                    changes = info.changes;
                 });
                 transaction();
+
+                if (changes === 0) {
+                    return res.status(404).json({ success: false, message: 'Bundle not found or already deleted' });
+                }
                 res.json({ success: true, message: 'Bundle deleted' });
             } catch (error) {
                 res.status(500).json({ error: error.message });

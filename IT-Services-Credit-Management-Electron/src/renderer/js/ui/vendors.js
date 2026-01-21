@@ -25,30 +25,42 @@ class VendorsUI {
             return;
         }
 
-        container.innerHTML = vendors.map(vendor => `
-            <div class="vendor-card" data-vendor-id="${vendor.vendor_id || vendor.VendorID}">
-                <div class="vendor-header">
-                    <h4 class="vendor-name">${vendor.name || vendor.Name}</h4>
-                    <div class="vendor-status active">ACTIVE</div>
-                </div>
-                <div class="vendor-details">
-                    <div class="vendor-info">
-                        <strong>📧 Email:</strong> ${vendor.contact_email || vendor.ContactEmail || 'Not provided'}<br>
-                        <strong>📱 Phone:</strong> ${vendor.contact_phone || vendor.ContactPhone || 'Not provided'}<br>
-                        <strong>📅 Added:</strong> ${Formatters.formatDate(vendor.created_date || vendor.CreatedDate)}
-                        ${(vendor.description || vendor.Description) ?
-                `<br><strong>📝 Description:</strong> ${vendor.description || vendor.Description}` : ''
-            }
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+                ${vendors.map(vendor => `
+                    <div class="vendor-card" style="background: white; border-radius: 16px; border: 1px solid #edf2f7; box-shadow: 0 4px 6px rgba(0,0,0,0.02); overflow: hidden; display: flex; flex-direction: column;">
+                        <div style="padding: 20px; flex: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                                <div>
+                                    <h4 style="margin: 0; font-size: 18px; color: #2d3748; font-weight: 700;">${vendor.name || vendor.Name}</h4>
+                                    <div style="display: inline-block; background: #f0fff4; color: #38a169; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Active</div>
+                                </div>
+                                <div style="font-size: 24px; background: #f7fafc; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">🏭</div>
+                            </div>
+                            
+                            <div style="font-size: 13px; color: #4a5568; line-height: 1.6; margin-bottom: 15px;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                    <span style="color: #a0aec0;">📧</span> <span>${vendor.contact_email || 'No email'}</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                    <span style="color: #a0aec0;">📱</span> <span>${vendor.contact_phone || 'No phone'}</span>
+                                </div>
+                                <div style="margin-top: 10px; font-style: italic; color: #718096; font-size: 12px; background: #f8fafc; padding: 8px; border-radius: 6px; border-left: 3px solid #edf2f7;">
+                                    ${vendor.description || 'No description provided.'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="padding: 15px 20px; background: #fcfcfc; border-top: 1px solid #f7fafc; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button onclick="addServiceForVendor('${vendor.vendor_id || vendor.VendorID}')" class="btn-small" style="background: #ebf4ff; color: #3182ce; font-weight: 700;">🔧 Add Item</button>
+                            <button onclick="purchaseCreditsForVendor('${vendor.vendor_id || vendor.VendorID}')" class="btn-small" style="background: #f0fff4; color: #38a169; font-weight: 700;">💸 Buy Stock</button>
+                            <button onclick="viewVendorServices('${vendor.vendor_id || vendor.VendorID}')" class="btn-small" style="background: #f7fafc; color: #4a5568; font-weight: 700;">📋 Catalog</button>
+                            <button onclick="VendorsUI.deleteVendor('${vendor.vendor_id || vendor.VendorID}')" class="btn-small" style="background: #fff5f5; color: #e53e3e; font-weight: 700;">🗑️ Remove</button>
+                        </div>
                     </div>
-                </div>
-                <div class="vendor-actions">
-                    <button onclick="addServiceForVendor('${vendor.vendor_id || vendor.VendorID}')" class="btn-small btn-success">🔧 Add Service</button>
-                    <button onclick="purchaseCreditsForVendor('${vendor.vendor_id || vendor.VendorID}')" class="btn-small btn-info">💸 Add Stock</button>
-                    <button onclick="viewVendorServices('${vendor.vendor_id || vendor.VendorID}')" class="btn-small btn-primary">📋 View Services</button>
-                    <button onclick="VendorsUI.deleteVendor('${vendor.vendor_id || vendor.VendorID}')" class="btn-small btn-danger">🗑️ Delete</button>
-                </div>
+                `).join('')}
             </div>
-        `).join('');
+        `;
     }
 
     static async deleteVendor(vendorId) {
@@ -90,37 +102,84 @@ class VendorsUI {
             }
 
             container.innerHTML = `
-                <div class="table-responsive">
-                    <table class="data-table">
+                <div class="table-responsive" style="border: 1px solid #edf2f7; box-shadow: none;">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse;">
                         <thead>
-                            <tr>
-                                <th>Vendor</th>
-                                <th>Name</th>
-                                <th>Type</th>
-                                <th class="text-right">Cost</th>
-                                <th class="text-right">Sales Price</th>
-                                <th>Date Added</th>
-                                <th>Description</th>
+                            <tr style="text-align: left; background: #f8fafc; border-bottom: 2px solid #edf2f7;">
+                                <th style="padding: 15px; font-size: 11px; text-transform: uppercase; color: #a0aec0; letter-spacing: 0.5px;">Vendor</th>
+                                <th style="padding: 15px; font-size: 11px; text-transform: uppercase; color: #a0aec0; letter-spacing: 0.5px;">Item Name</th>
+                                <th style="padding: 15px; font-size: 11px; text-transform: uppercase; color: #a0aec0; letter-spacing: 0.5px;">Type</th>
+                                <th style="padding: 15px; font-size: 11px; text-transform: uppercase; color: #a0aec0; letter-spacing: 0.5px; text-align: right;">Cost</th>
+                                <th style="padding: 15px; font-size: 11px; text-transform: uppercase; color: #a0aec0; letter-spacing: 0.5px; text-align: right;">Price</th>
+                                <th style="padding: 15px; font-size: 11px; text-transform: uppercase; color: #a0aec0; letter-spacing: 0.5px;">Description</th>
+                                <th style="padding: 15px; font-size: 11px; text-transform: uppercase; color: #a0aec0; letter-spacing: 0.5px; text-align: center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${services.map(s => `
-                                <tr>
-                                    <td><strong>${s.vendor_name}</strong></td>
-                                    <td>${s.service_name}</td>
-                                    <td><span class="badge badge-light">${(s.item_type || 'subscription').toUpperCase()}</span></td>
-                                    <td class="text-right font-mono text-muted">$${(s.cost_price || 0).toFixed(2)}</td>
-                                    <td class="text-right font-mono"><strong>$${(s.default_price || 0).toFixed(2)}</strong></td>
-                                    <td><small>${Formatters.formatDate(s.created_date)}</small></td>
-                                    <td><small class="text-muted">${s.description || '-'}</small></td>
-                                </tr>
-                            `).join('')}
+                            ${services.map(s => {
+                                const typeColors = {
+                                    'subscription': { bg: '#ebf4ff', text: '#3182ce' },
+                                    'hardware': { bg: '#faf5ff', text: '#805ad5' },
+                                    'fee': { bg: '#fffaf0', text: '#dd6b20' }
+                                };
+                                const colors = typeColors[s.item_type] || typeColors['subscription'];
+                                return `
+                                    <tr style="border-bottom: 1px solid #f7fafc;">
+                                        <td style="padding: 15px;"><strong>${s.vendor_name}</strong></td>
+                                        <td style="padding: 15px; color: #2d3748; font-weight: 600;">${s.service_name}</td>
+                                        <td style="padding: 15px;">
+                                            <span style="background: ${colors.bg}; color: ${colors.text}; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase;">
+                                                ${s.item_type || 'subscription'}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 15px; text-align: right; color: #718096; font-family: monospace;">$${(s.cost_price || 0).toFixed(2)}</td>
+                                        <td style="padding: 15px; text-align: right; color: #2d3748; font-weight: 700; font-family: monospace;">$${(s.default_price || 0).toFixed(2)}</td>
+                                        <td style="padding: 15px; color: #a0aec0; font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            ${s.description || '-'}
+                                        </td>
+                                        <td style="padding: 15px; text-align: center;">
+                                            <button onclick="VendorsUI.deleteService('${s.service_id}')" class="btn-icon" style="color: #e53e3e; background: #fff5f5; padding: 6px; border-radius: 4px;" title="Remove Item">🗑️</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
             `;
         } catch (error) {
             console.error('❌ Error loading service catalog:', error);
+        }
+    }
+
+    static async deleteService(serviceId) {
+        if (!confirm('Are you sure you want to remove this item from the catalog? This action cannot be undone.')) {
+            return;
+        }
+
+        const password = prompt('Please enter the admin password to confirm deletion:');
+        if (password !== '1234') {
+            Alerts.showError('Access Denied', 'Incorrect password.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/vendor-services/${serviceId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                Alerts.showSuccess('Deleted', 'Item removed from catalog.');
+                this.loadAndDisplayServices();
+                // Also update POS catalog if it's open or cached
+                if (window.POSUI) POSUI.loadCatalog();
+            } else {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to delete service');
+            }
+        } catch (error) {
+            console.error('❌ Error deleting service:', error);
+            Alerts.showError('Delete Error', error.message);
         }
     }
 

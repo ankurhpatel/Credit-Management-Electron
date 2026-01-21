@@ -169,11 +169,47 @@ class SettingsUI {
         const btn = document.querySelector(`#settings .tab-button[onclick*="${tabId}"]`);
         if (btn) btn.classList.add('active');
     }
+
+    static async resetDatabase() {
+        if (!confirm('⚠️ WARNING: This will DELETE ALL DATA (Customers, Sales, Inventory).\n\nAre you sure you want to proceed?')) {
+            return;
+        }
+
+        if (!confirm('🛑 FINAL CONFIRMATION: This action cannot be undone.\n\nClick OK to permanently erase the database.')) {
+            return;
+        }
+
+        const password = prompt('Please enter the admin password to confirm reset:');
+        if (password !== '1234') {
+            Alerts.showError('Access Denied', 'Incorrect password.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/database/reset', {
+                method: 'POST',
+                headers: { 'password': password }
+            });
+
+            if (response.ok) {
+                alert('✅ Database has been reset successfully. The application will now reload.');
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to reset database');
+            }
+        } catch (error) {
+            console.error('❌ Reset Error:', error);
+            Alerts.showError('Reset Failed', error.message);
+        }
+    }
 }
 
 // Global wrappers
 function saveAppSettings(e) { SettingsUI.saveAppSettings(e); }
 function saveReceiptSettings(e) { SettingsUI.saveReceiptSettings(e); }
 function showSettingsTab(id) { SettingsUI.showTab(id); }
+// No separate wrapper needed since we call SettingsUI.resetDatabase() directly in HTML
+// But adding it just in case I used the global function pattern elsewhere (I didn't, I used SettingsUI.resetDatabase() in HTML)
 
 window.SettingsUI = SettingsUI;

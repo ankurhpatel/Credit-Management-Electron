@@ -68,6 +68,8 @@ class DatabaseManager {
             });
             this.db.exec('PRAGMA foreign_keys = ON');
             
+            this.saveToFile(true); // Force save to disk
+
             console.log('✅ All records cleared. Schema preserved.');
         } catch (error) {
             console.error('❌ Error clearing data:', error);
